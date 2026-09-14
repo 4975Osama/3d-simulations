@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <link rel="icon"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23082d52'/%3E%3Cpath d='M3 20q5-5 10 0t10 0 6-3' stroke='%234cc3ff' stroke-width='3' fill='none'/%3E%3C/svg%3E" />
+  <title>3D Simulations Portal — Pakistan Water Surface</title>
+  <link rel="stylesheet" href="./vendor/maplibre-gl.css" />
+  <style>
+    :root {
+      --bg: #04101f;
+      --side: #060f1e;
+      --card: rgba(13, 26, 46, 0.72);
+      --card2: rgba(16, 31, 55, 0.9);
+      --line: rgba(96, 150, 220, 0.14);
+      --line2: rgba(96, 150, 220, 0.28);
+      --txt: #e8eef7;
+      --dim: #8ea5c4;
+      --accent: #38b6ff;
+      --cyan: #22d3ee;
+      --red: #fb5161;
+      --amber: #f5a623;
+      --green: #34d399;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      font: 13px/1.45 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+      color: var(--txt);
+    }
+
+    /* ============================== dashboard grid (layout per design) */
+    #dash {
+      display: grid;
+      height: 100vh;
+      grid-template-columns: 230px minmax(0, 1fr) 312px;
+      grid-template-rows: 62px auto minmax(0, 1fr) 92px;
+    }
+
+    /* ============================== sidebar */
+    #side {
+      grid-row: 1 / 5;
+      background: var(--side);
+      border-right: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      padding: 14px 12px;
+    }
+
+    #brand {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding: 2px 6px 16px;
+    }
+
+    #brand .crest {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      flex: none;
+      background: linear-gradient(145deg, #0b2d52, #114f8a);
+      border: 1px solid var(--line2);
+      display: grid;
+      place-items: center;
+    }
+
+    #brand h1 {
+      font-size: 15px;
+      margin: 0;
+      line-height: 1.15;
+      letter-spacing: .4px;
+    }
+
+    #brand h1 span {
+      display: block;
+      font-size: 9.5px;
+      color: var(--accent);
+      letter-spacing: 2.4px;
+      font-weight: 600;
+    }
+
+    nav {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      margin-top: 6px;
+    }
+
+    nav a {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 9px 12px;
+      border-radius: 9px;
+      color: var(--dim);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 520;
+      position: relative;
+    }
+
+    nav a svg {
+      width: 17px;
+      height: 17px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.7;
+      opacity: .9;
+    }
+
+    nav a:hover {
+      background: rgba(56, 182, 255, 0.07);
+      color: var(--txt);
+    }
+
+    nav a.on {
+      background: linear-gradient(90deg, rgba(56, 182, 255, .20), rgba(56, 182, 255, .05));
+      color: #d9edff;
+      box-shadow: inset 2.5px 0 0 var(--accent);
+    }
+
+    nav .badge {
+      margin-left: auto;
+      background: var(--red);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      min-width: 17px;
+      height: 17px;
+      border-radius: 9px;
+      display: grid;
+      place-items: center;
+      padding: 0 4px;
+    }
+
+    #side .foot {
+      margin-top: auto;
+      padding: 12px 8px 2px;
+      border-top: 1px solid var(--line);
+      color: var(--dim);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    #side .foot b {
+      color: var(--accent);
+    }
+
+    /* ============================== topbar */
+    #topbar {
+      grid-column: 2 / 4;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(6, 15, 30, 0.6);
+    }
+
+    #topbar .t h2 {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 640;
+    }
+
+    #topbar .t div {
+      font-size: 11px;
+      color: var(--dim);
+      margin-top: 1px;
+    }
+
+    #topbar .sp {
+      flex: 1;
+    }
+
+    .chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--dim);
+      border: 1px solid var(--line);
+      background: var(--card);
+      border-radius: 9px;
+      padding: 7px 11px;
+    }
+
+    .chip b {
+      color: var(--txt);
+      font-weight: 620;
+    }
+
+    .live-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      animation: pulse 1.6s infinite;
+    }
+
+    @keyframes pulse {
+      50% {
+        opacity: .35;
+      }
+    }
+
+    #search {
+      position: relative;
+      width: 250px;
+    }
+
+    #search input {
+      width: 100%;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      color: var(--txt);
+      font: inherit;
+      font-size: 12.5px;
+      padding: 8px 12px 8px 32px;
+      outline: none;
+    }
+
+    #search input:focus {
+      border-color: var(--line2);
+    }
+
+    #search svg {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 15px;
+      height: 15px;
+      stroke: var(--dim);
+      fill: none;
+      stroke-width: 1.8;
+    }
+
+    .avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      flex: none;
+      background: linear-gradient(145deg, #11497e, #38b6ff);
+      border: 1px solid var(--line2);
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      font-size: 13px;
+      color: #fff;
+    }
+
+    /* ============================== stat cards */
+    #stats {
+      grid-column: 2;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      padding: 12px 14px 10px;
+    }
+
+    .stat {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 11px 13px;
+      display: flex;
+      gap: 11px;
+      align-items: flex-start;
+      min-width: 0;
+    }
+
+    .stat .ic {
+      width: 34px;
+      height: 34px;
+      flex: none;
+      border-radius: 9px;
+      display: grid;
+      place-items: center;
+      background: rgba(56, 182, 255, .12);
+      border: 1px solid rgba(56, 182, 255, .25);
+    }
+
+    .stat .ic svg {
+      width: 18px;
+      height: 18px;
+      stroke-width: 1.7;
+      fill: none;
+    }
+
+    .stat .v {
+      font-size: 21px;
+      font-weight: 700;
+      letter-spacing: .2px;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.1;
+    }
+
+    .stat .v small {
+      font-size: 11px;
+      color: var(--dim);
+      font-weight: 520;
+    }
+
+    .stat .k {
+      font-size: 11px;
+      color: var(--dim);
+      margin-top: 2px;
+    }
+
+    .stat .d {
+      font-size: 10.5px;
+      margin-top: 3px;
+    }
+
+    .up {
+      color: var(--green);
+    }
+
+    .down {
+      color: var(--red);
+    }
+
+    .mid {
+      color: var(--amber);
+    }
+
+    /* ============================== map stage */
+    #mapwrap {
+      grid-column: 2;
+      grid-row: 3;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      margin: 2px 14px 10px;
+      min-height: 360px;
+    }
+
+    #map {
+      position: absolute;
+      inset: 0;
+    }
+
+    #water {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+    }
+
+    .panel {
+      position: absolute;
+      background: rgba(8, 14, 24, 0.86);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--line2);
+      border-radius: 12px;
+      box-shadow: 0 10px 34px rgba(0, 0, 0, .5);
+    }
+
+    #ui {
+      top: 12px;
+      left: 12px;
+      width: 272px;
+      padding: 14px 14px 12px;
+      z-index: 5;
+      max-height: calc(100% - 24px);
+      overflow-y: auto;
+      scrollbar-width: thin;
+    }
+
+    #ui h1 {
+      margin: 0 0 2px;
+      font-size: 15px;
+      letter-spacing: .2px;
+      font-weight: 650;
+    }
+
+    #ui .sub {
+      color: var(--dim);
+      font-size: 11.5px;
+      margin-bottom: 12px;
+    }
+
+    .grp {
+      margin-bottom: 11px;
+    }
+
+    .lbl {
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: .09em;
+      color: var(--dim);
+      margin-bottom: 5px;
+    }
+
+    .row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    button,
+    .seg {
+      font: inherit;
+      font-size: 12px;
+      color: var(--txt);
+      background: rgba(255, 255, 255, .06);
+      border: 1px solid var(--line2);
+      border-radius: 8px;
+      padding: 5px 9px;
+      cursor: pointer;
+      transition: .12s;
+    }
+
+    button:hover {
+      background: rgba(255, 255, 255, .13);
+    }
+
+    button.on {
+      background: rgba(76, 195, 255, .22);
+      border-color: rgba(76, 195, 255, .55);
+      color: #dff2ff;
+    }
+
+    input[type=range] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .val {
+      float: right;
+      color: var(--accent);
+      font-variant-numeric: tabular-nums;
+    }
+
+    #hud {
+      bottom: 12px;
+      left: 12px;
+      padding: 9px 12px;
+      font-size: 11.5px;
+      color: var(--dim);
+      font-variant-numeric: tabular-nums;
+      z-index: 5;
+      line-height: 1.6;
+    }
+
+    #hud b {
+      color: var(--txt);
+      font-weight: 600;
+    }
+
+    #legend {
+      bottom: 12px;
+      right: 12px;
+      padding: 10px 12px;
+      z-index: 5;
+      font-size: 11.5px;
+    }
+
+    .ramp {
+      width: 150px;
+      height: 9px;
+      border-radius: 5px;
+      margin: 5px 0 3px;
+      background: linear-gradient(90deg, #eaf6ff, #2b6698, #082d52);
+    }
+
+    .rampx {
+      display: flex;
+      justify-content: space-between;
+      color: var(--dim);
+      font-size: 10px;
+    }
+
+    .marker {
+      font-size: 11px;
+      font-weight: 600;
+      color: #fff;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, .9), 0 0 8px rgba(0, 0, 0, .7);
+      white-space: nowrap;
+      transform: translate(6px, -50%);
+      pointer-events: none;
+    }
+
+    .marker.light {
+      color: #26313f;
+      text-shadow: 0 1px 2px rgba(255, 255, 255, .95), 0 0 7px rgba(255, 255, 255, .8);
+    }
+
+    #boot {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      z-index: 20;
+      background: #060f1e;
+      color: var(--dim);
+      transition: opacity .5s;
+    }
+
+    #tourcard {
+      position: absolute;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(620px, calc(100% - 24px));
+      padding: 14px 16px 12px;
+      z-index: 8;
+      background: rgba(8, 14, 24, 0.9);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--line2);
+      border-radius: 12px;
+      box-shadow: 0 10px 34px rgba(0, 0, 0, .5);
+    }
+
+    #tourcard .tk {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+
+    #tourcard .tt {
+      font-size: 15px;
+      font-weight: 650;
+      margin-bottom: 4px;
+    }
+
+    #tourcard .tb {
+      color: var(--dim);
+      font-size: 12.5px;
+      line-height: 1.5;
+    }
+
+    #tourcard .tbtns {
+      display: flex;
+      gap: 6px;
+      margin-top: 10px;
+      align-items: center;
+    }
+
+    #tourcard .tsp {
+      flex: 1;
+    }
+
+    #tourcard button:disabled {
+      opacity: .35;
+      cursor: default;
+    }
+
+    #tourcard #tk-dots i {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, .18);
+      margin-left: 4px;
+      vertical-align: middle;
+    }
+
+    #tourcard #tk-dots i.on {
+      background: var(--accent);
+    }
+
+    .maplibregl-ctrl-group {
+      background: rgba(8, 14, 24, .86) !important;
+      border: 1px solid var(--line2);
+    }
+
+    .maplibregl-ctrl-group button+button {
+      border-top: 1px solid var(--line);
+    }
+
+    .maplibregl-ctrl-icon {
+      filter: invert(1) hue-rotate(180deg) brightness(1.4);
+    }
+
+    /* ============================== right column */
+    #right {
+      grid-column: 3;
+      grid-row: 2 / 4;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      padding: 12px 14px 10px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .rpanel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 11px 13px;
+    }
+
+    #hazsel {
+      width: 100%;
+      background: rgba(255, 255, 255, .06);
+      color: var(--txt);
+      border: 1px solid var(--line2);
+      border-radius: 8px;
+      font: inherit;
+      font-size: 12px;
+      padding: 6px 8px;
+      margin-bottom: 7px;
+      outline: none;
+    }
+
+    #hazsel option {
+      background: #0a1728;
+    }
+
+    .hazrow {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .hazrow button {
+      flex: 1;
+    }
+
+    .note {
+      color: var(--dim);
+      font-size: 10.5px;
+      line-height: 1.45;
+    }
+
+    .maplibregl-popup-content {
+      background: rgba(10, 19, 34, .94) !important;
+      color: var(--txt) !important;
+      border: 1px solid var(--line2);
+      border-radius: 10px;
+      box-shadow: 0 8px 26px rgba(0, 0, 0, .55);
+      padding: 11px 13px !important;
+      backdrop-filter: blur(10px);
+    }
+
+    .maplibregl-popup-tip {
+      border-top-color: rgba(10, 19, 34, .94) !important;
+      border-bottom-color: rgba(10, 19, 34, .94) !important;
+    }
+
+    .bdyrow {
+      display: flex;
+      gap: 6px;
+      margin: 8px 0 6px;
+    }
+
+    .bdyrow button {
+      flex: 1;
+      font-size: 11.5px;
+    }
+
+    .rpanel h3 {
+      margin: 0 0 8px;
+      font-size: 12.5px;
+      font-weight: 640;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .rpanel h3 .more {
+      color: var(--accent);
+      font-size: 10.5px;
+      font-weight: 520;
+    }
+
+    .krow {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--dim);
+      padding: 5.5px 0;
+      border-bottom: 1px dashed rgba(96, 150, 220, .10);
+    }
+
+    .krow:last-child {
+      border-bottom: 0;
+    }
+
+    .krow b {
+      color: var(--txt);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .qa {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px;
+    }
+
+    .qa button {
+      padding: 8px 6px;
+      text-align: center;
+      font-size: 11.5px;
+    }
+
+    .qa button.wide {
+      grid-column: 1 / 3;
+    }
+
+    .ds {
+      font-size: 11.5px;
+      color: var(--dim);
+      padding: 6px 0;
+      border-bottom: 1px dashed rgba(96, 150, 220, .10);
+    }
+
+    .ds:last-child {
+      border-bottom: 0;
+    }
+
+    .ds b {
+      color: var(--txt);
+      display: block;
+      font-size: 12px;
+    }
+
+    .ds .bar {
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, .08);
+      margin-top: 5px;
+      overflow: hidden;
+    }
+
+    .ds .bar i {
+      display: block;
+      height: 100%;
+      border-radius: 2px;
+      background: linear-gradient(90deg, #22d3ee, #38b6ff);
+    }
+
+    .hot {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .hot button {
+      color: var(--dim);
+    }
+
+    .hot button:hover {
+      color: var(--txt);
+      border-color: rgba(251, 81, 97, .5);
+    }
+
+    .hot .dotx {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--red);
+      margin-right: 5px;
+      vertical-align: 1px;
+    }
+
+    /* ============================== alerts strip */
+    #alerts {
+      grid-column: 2 / 4;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding: 0 14px 12px;
+      margin-top: -4px;
+    }
+
+    .acard {
+      flex: 1;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 9px 12px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .acard .a-ic {
+      width: 30px;
+      height: 30px;
+      flex: none;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background: rgba(251, 81, 97, .13);
+    }
+
+    .acard .a-ic.warn {
+      background: rgba(245, 166, 35, .13);
+    }
+
+    .acard .a-ic svg {
+      width: 16px;
+      height: 16px;
+      stroke-width: 1.8;
+      fill: none;
+    }
+
+    .acard b {
+      font-size: 12px;
+      display: block;
+    }
+
+    .acard span {
+      color: var(--dim);
+      font-size: 11px;
+      display: block;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    @media (max-width: 1180px) {
+      #stats {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="dash">
+
+    <!-- ================= sidebar ================= -->
+    <aside id="side">
+      <div id="brand">
+        <div class="crest">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7dd3fc" stroke-width="1.8">
+            <path d="M3 15q4.5-4.5 9 0t9 0" />
+            <path d="M3 19q4.5-4.5 9 0t9 0" opacity=".55" />
+            <path d="M12 3l2.4 4.8L12 10l-2.4-2.2z" opacity=".85" />
+          </svg>
+        </div>
+        <h1>3D SIMULATIONS<span>PORTAL · PAKISTAN</span></h1>
+      </div>
+      <nav>
+        <a class="on" href="#"><svg viewBox="0 0 24 24">
+            <path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z" />
+          </svg>Dashboard</a>
+        <a href="#"><svg viewBox="0 0 24 24">
+            <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zm0 0v16m6-14v16" />
+          </svg>Map View</a>
+        <a href="#"><svg viewBox="0 0 24 24">
+            <path d="M12 3l9 5-9 5-9-5 9-5z" />
+            <path d="M3 13l9 5 9-5" opacity=".6" />
+            <path d="M3 17.5l9 5 9-5" opacity=".35" />
+          </svg>Comparison Map</a>
+        <a href="#"><svg viewBox="0 0 24 24">
+            <path d="M4 20V10m6 10V4m6 16v-7m4 7H2" />
+          </svg>Analytics &amp; Charts</a>
+        <a href="#"><svg viewBox="0 0 24 24">
+            <path d="M7 3h8l4 4v14H7z" />
+            <path d="M15 3v4h4M10 13h5m-5 4h5" opacity=".7" />
+          </svg>Reports</a>
+        <a href="#"><svg viewBox="0 0 24 24">
+            <path d="M18 16v-5a6 6 0 1 0-12 0v5l-2 3h16z" />
+            <path d="M10 21h4" />
+          </svg>Alerts<span class="badge">3</span></a>
+        <a href="#"><svg viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19 12a7 7 0 0 0-.1-1.3l2-1.6-2-3.4-2.3 1a7 7 0 0 0-2.3-1.3L14 2h-4l-.3 2.4a7 7 0 0 0-2.3 1.3l-2.3-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .9.1 1.3l-2 1.6 2 3.4 2.3-1a7 7 0 0 0 2.3 1.3L10 22h4l.3-2.4a7 7 0 0 0 2.3-1.3l2.3 1 2-3.4-2-1.6c.1-.4.1-.9.1-1.3z" />
+          </svg>Settings</a>
+      </nav>
+      <div class="foot">Live surface physics for <b>a safer tomorrow</b> — every polygon, every frame, computed on your
+        GPU.</div>
+    </aside>
+
+    <!-- ================= topbar ================= -->
+    <header id="topbar">
+      <div class="t">
+        <h2>Pakistan Water Surface Portal</h2>
+        <div>Early Insights &nbsp;|&nbsp; Safer Communities &nbsp;|&nbsp; Resilient Pakistan</div>
+      </div>
+      <div class="sp"></div>
+      <div id="search">
+        <svg viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="7" />
+          <path d="M16.5 16.5L21 21" />
+        </svg>
+        <input id="q" type="text" placeholder="Search hotspot — Tarbela, Sukkur, Panjnad…" />
+      </div>
+      <div class="chip"><span class="live-dot"></span><span><b id="clock">–</b>&nbsp;<span id="date">–</span></span>
+      </div>
+      <div class="avatar">PK</div>
+    </header>
+
+    <!-- ================= stat cards ================= -->
+    <section id="stats">
+      <div class="stat">
+        <div class="ic"><svg viewBox="0 0 24 24" stroke="#38b6ff">
+            <path d="M12 3s6 6.4 6 10.5a6 6 0 1 1-12 0C6 9.4 12 3 12 3z" />
+          </svg></div>
+        <div>
+          <div class="v">3,688</div>
+          <div class="k">Water bodies simulated</div>
+          <div class="d up">▲ 345 river reaches · 3,343 flood sheets</div>
+        </div>
+      </div>
+      <div class="stat">
+        <div class="ic"><svg viewBox="0 0 24 24" stroke="#22d3ee">
+            <path d="M3 16q4.5-4 9 0t9 0M3 11q4.5-4 9 0t9 0" opacity=".85" />
+          </svg></div>
+        <div>
+          <div class="v">91,429 <small>km²</small></div>
+          <div class="k">2022 flood extent (UNOSAT VIIRS)</div>
+          <div class="d down">▲ record monsoon · 33 M affected</div>
+        </div>
+      </div>
+      <div class="stat">
+        <div class="ic"><svg viewBox="0 0 24 24" stroke="#f5a623">
+            <path d="M13 3L4 14h6l-1 7 9-11h-6z" />
+          </svg></div>
+        <div>
+          <div class="v"><span id="st-fps">–</span></div>
+          <div class="k">Engine fps · <span id="st-polys">–</span> polys live</div>
+          <div class="d mid" id="st-reproj">reprojection – ms</div>
+        </div>
+      </div>
+      <div class="stat">
+        <div class="ic"><svg viewBox="0 0 24 24" stroke="#34d399">
+            <path d="M4 6h16M4 12h16M4 18h16" opacity=".9" />
+          </svg></div>
+        <div>
+          <div class="v">143,786</div>
+          <div class="k">Animated mesh vertices</div>
+          <div class="d up">stateless fill · every frame, on GPU</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= map ================= -->
+    <main id="mapwrap">
+      <div id="map"></div>
+
+      <div id="ui" class="panel">
+        <h1>Indus Basin — live water surface</h1>
+        <div class="sub">WebGL surface-fill layer over MapLibre · OSM river geometry</div>
+
+        <div class="grp">
+          <div class="lbl">Basemap / palette</div>
+          <div class="row" id="styles">
+            <button data-style="terrain">terrain</button>
+            <button data-style="satellite" class="on">satellite</button>
+            <button data-style="dark">dark</button>
+            <button data-style="streets">streets</button>
+          </div>
+        </div>
+
+        <div class="grp">
+          <div class="lbl">Animation <span class="val" id="spdv">1.0×</span></div>
+          <input type="range" id="speed" min="0" max="3" step="0.05" value="1" />
+          <div class="row" style="margin-top:7px">
+            <button id="play" class="on">⏸ Pause</button>
+            <button id="rain">🌧 Rain</button>
+          </div>
+        </div>
+
+        <div class="grp">
+          <div class="lbl">Water bodies</div>
+          <div class="row" id="bodies">
+            <button data-bodies="rivers" class="on">rivers</button>
+            <button data-bodies="floods">floods 2022</button>
+            <button data-bodies="both">both</button>
+          </div>
+        </div>
+
+        <div class="grp">
+          <div class="lbl">Water look</div>
+          <div class="row" id="looks">
+            <button data-look="realistic" class="on">realistic</button>
+            <button data-look="glassy">glassy</button>
+            <button data-look="spec">spec</button>
+          </div>
+        </div>
+
+        <div class="grp">
+          <div class="lbl">Water opacity <span class="val" id="opv">100%</span></div>
+          <input type="range" id="opacity" min="0" max="100" step="1" value="100" />
+        </div>
+
+        <div class="grp">
+          <div class="lbl">Guided tour</div>
+          <div class="row"><button id="tour" style="flex:1">🎬 Cinematic tour — start</button></div>
+        </div>
+
+        <div class="grp">
+          <div class="lbl">Camera</div>
+          <div class="row">
+            <button id="tilt">Tilt 60°</button>
+            <button id="terrain3d" class="on">3D terrain</button>
+            <button id="spin">Orbit</button>
+          </div>
+        </div>
+
+        <div class="grp">
+          <div class="lbl">Fly to</div>
+          <div class="row" id="spots"></div>
+        </div>
+
+        <div class="grp" style="margin-bottom:0">
+          <div class="lbl">Diagnostics</div>
+          <div class="row">
+            <button id="coarse"
+              title="Reproject the mesh through a coarse interpolated lon/lat→screen grid instead of exact per-vertex project() — the classic sliver bug">Coarse
+              projection bug</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="hud" class="panel">
+        <div><b id="fps">–</b> fps · <b id="drawn">–</b>/<b id="npoly">–</b> polys drawn · <b id="nvert">–</b> verts
+        </div>
+        <div>reproject <b id="pms">–</b> ms (<b id="nproj">–</b> pts) · zoom <b id="zoom">–</b> · pitch <b
+            id="pitch">–</b>°</div>
+      </div>
+
+      <div id="legend" class="panel">
+        <div style="font-weight:600;margin-bottom:2px">Depth-to-bank (SDF)</div>
+        <div class="ramp"></div>
+        <div class="rampx"><span>bank · foam</span><span>deep</span></div>
+      </div>
+
+      <div id="boot">loading Indus basin geometry…</div>
+    </main>
+
+    <!-- ================= right column ================= -->
+    <aside id="right">
+      <div class="rpanel">
+        <h3>Simulation status <span class="more">LIVE</span></h3>
+        <div class="krow"><span>Engine rate</span><b id="r-fps">–</b></div>
+        <div class="krow"><span>Polygons drawn</span><b id="r-drawn">–</b></div>
+        <div class="krow"><span>Mesh vertices</span><b id="r-verts">–</b></div>
+        <div class="krow"><span>Reprojection</span><b id="r-reproj">–</b></div>
+        <div class="krow"><span>Camera zoom / tilt</span><b id="r-cam">–</b></div>
+        <div class="krow"><span>Active look · palette</span><b id="r-look">–</b></div>
+      </div>
+
+      <div class="rpanel">
+        <h3>Disaster simulations <span class="more" id="hazcount">idle</span></h3>
+        <select id="hazsel"></select>
+        <div class="hazrow">
+          <button id="haz-show">Show sites</button>
+          <button id="haz-fly">Fly to zone</button>
+          <button id="haz-place">Place ◉</button>
+        </div>
+        <div class="hazrow"><button id="haz-clear">Clear all</button></div>
+        <div class="note">Real Pakistan event sites · animated CSS/WebGL FX per severity
+          (storm, fire, quake, GLOF…); icon rings scale to severity. “Place ◉” then
+          click anywhere on the map for a custom event.</div>
+      </div>
+
+      <div class="rpanel">
+        <h3>Admin boundaries</h3>
+        <div class="bdyrow">
+          <button id="bdy-pro">Provincial glow</button>
+          <button id="bdy-dis">District lines</button>
+        </div>
+        <div class="note" id="bdy-state">overlay off — provincial data ships locally;
+          district file drops into <b>portal/geojson/</b></div>
+      </div>
+
+      <div class="rpanel">
+        <h3>Quick actions</h3>
+        <div class="qa">
+          <button id="qa-tour" class="wide">▶ &nbsp;Start cinematic tour (10 scenes)</button>
+          <button id="qa-spread" class="wide">⏵ &nbsp;Flood 2022 — how the water spread</button>
+          <button id="qa-terrain">3D terrain</button>
+          <button id="qa-orbit">Orbit</button>
+          <button id="qa-pause">Pause water</button>
+          <button id="qa-reset">Reset view</button>
+        </div>
+      </div>
+
+      <div class="rpanel">
+        <h3>Water datasets</h3>
+        <div class="ds"><b>VIIRS flood mask, 01–31 Aug 2022 · UNOSAT</b>3,343 fused sheets · 91,429 km² · 83,554 verts
+          <div class="bar"><i style="width:82%"></i></div>
+        </div>
+        <div class="ds"><b>OSM hydrology · riverbank + reservoir</b>308 reaches · 28 braided belts · 9 reservoirs
+          <div class="bar"><i style="width:48%"></i></div>
+        </div>
+        <div class="ds"><b>Natural Earth vector basemap · local</b>land, provinces, 26 city markers · zero network
+          <div class="bar"><i style="width:30%"></i></div>
+        </div>
+      </div>
+
+      <div class="rpanel">
+        <h3>Monitored hotspots <span class="more">fly to</span></h3>
+        <div class="hot" id="hotspots"></div>
+      </div>
+    </aside>
+
+    <!-- ================= alerts strip ================= -->
+    <footer id="alerts">
+      <div class="acard">
+        <div class="a-ic"><svg viewBox="0 0 24 24" stroke="#fb5161">
+            <path d="M12 9v5m0 3.5v.1M10.3 3.8 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0z" />
+          </svg></div>
+        <div><b>Record monsoon footprint</b><span>Aug 2022 · one-third of Pakistan inundated · UNOSAT</span></div>
+      </div>
+      <div class="acard">
+        <div class="a-ic warn"><svg viewBox="0 0 24 24" stroke="#f5a623">
+            <path d="M12 3v3m6.4 2.4 2.1-2.1M9 21a4.5 4.5 0 1 1 .6-8.96A5.5 5.5 0 0 1 20 13.5 3.75 3.75 0 0 1 19.5 21z"
+              opacity=".9" />
+          </svg></div>
+        <div><b>Sindh standing sea, ~100 km</b><span>Dadu–Larkana sheet captured by VIIRS, Aug 31 2022</span></div>
+      </div>
+      <div class="acard">
+        <div class="a-ic warn"><svg viewBox="0 0 24 24" stroke="#f5a623">
+            <path d="M3 18h18M5 18l3.5-12h7L19 18M9 10h6" opacity=".9" />
+          </svg></div>
+        <div><b>Glacial lake outburst risk (GLOF)</b><span>GB &amp; KP ranges — 3,000+ glacial lakes monitored</span>
+        </div>
+      </div>
+      <div class="acard">
+        <div class="a-ic" style="background:rgba(52,211,153,.13)"><svg viewBox="0 0 24 24" stroke="#34d399">
+            <path d="M3 15q4.5-4.5 9 0t9 0M3 19q4.5-4.5 9 0t9 0" opacity=".9" />
+          </svg></div>
+        <div><b>Surface engine nominal</b><span>flow · foam · refraction · reflection · spread replay</span></div>
+      </div>
+    </footer>
+  </div>
+
+  <script src="./vendor/maplibre-gl.js"></script>
+  <script type="module" src="./app.js"></script>
+  <script type="module" src="./dash.js"></script>
+  <script type="module" src="./effects.js"></script>
+</body>
+
+</html>

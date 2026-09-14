@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Simulations Map</title>
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Google Identity Services (sign-in for the "Add Video" -> Google Drive feature) -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+    <!-- Mapbox GL JS -->
+    <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
+    <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Menu Toggle Button (Mobile) -->
+        <div class="menu-toggle" id="menuToggle">
+            <i class="fas fa-bars"></i>
+        </div>
+
+        <!-- Logo Header -->
+        <div class="menu-header">
+            <div class="logo-container">
+                <div class="logo">
+                    <img src="Data/left.png" alt="">
+                </div>
+                <div class="header-text">
+                    <h1>3D SIMULATIONS</h1>
+                    <h2>HAZARD MAP</h2>
+                </div>
+            </div>
+        </div>
+
+        <!-- Icon Navigation Sidebar -->
+        <div class="icon-nav" id="iconNav">
+            <button class="icon-nav-btn" id="navTechEW" type="button">
+                <i class="fas fa-satellite-dish"></i>
+                <span>Tech-EW</span>
+            </button>
+            <button class="icon-nav-btn" id="navBoundaries" type="button">
+                <img src="Data/map.png" alt="">
+                <span>Boundaries</span>
+            </button>
+        </div>
+
+        <!-- Futuristic Overlay Menu -->
+        <div class="overlay-menu" id="overlayMenu">
+
+            <!-- Tech-EW Parent Section -->
+            <div class="tech-ew-section nav-hidden" id="techEWSection">
+                <div class="tech-ew-header" id="techEWHeader">
+                    <div class="hazard-icon-wrapper">
+                        <i class="fas fa-satellite-dish tech-ew-icon"></i>
+                    </div>
+                    <span class="hazard-name">Tech-EW</span>
+                    <i class="fas fa-chevron-down tech-ew-chevron"></i>
+                </div>
+                <div class="tech-ew-content" id="techEWContent">
+
+                    <!-- Snow Emergencies -->
+            <div class="hazard-section" data-hazard="snow-emergencies">
+                <div class="hazard-header snow-gradient">
+                    <div class="hazard-icon-wrapper">
+                        <img src="Data/snow_emg.png" alt="Snow" class="hazard-img">
+                    </div>
+                    <span class="hazard-name">Snow Emergencies</span>
+                </div>
+            </div>
+
+            <!-- Smog/Fog -->
+            <div class="hazard-section" data-hazard="smog-fog">
+                <div class="hazard-header smog-gradient">
+                    <div class="hazard-icon-wrapper">
+                        <img src="Data/smog_ic.png" alt="Smog" class="hazard-img">
+                    </div>
+                    <span class="hazard-name">Smog/Fog</span>
+                </div>
+            </div>
+
+            <!-- Landslides -->
+            <div class="hazard-section" data-hazard="landslide-mudslide">
+                <div class="hazard-header landslide-gradient">
+                    <div class="hazard-icon-wrapper">
+                        <img src="Data/Landslide_ic.png" alt="Landslide" class="hazard-img">
+                    </div>
+                    <span class="hazard-name">Landslide - Mudslide</span>
+                </div>
+            </div>
+
+            <!-- Floods -->
+            <div class="hazard-section" data-hazard="floods">
+                <div class="hazard-header flood-gradient">
+                    <div class="hazard-icon-wrapper">
+                        <img src="Data/flood_ic.png" alt="Floods" class="hazard-img">
+                    </div>
+                    <span class="hazard-name">Floods</span>
+                </div>
+            </div>
+
+            <!-- Earthquake -->
+            <div class="hazard-section" data-hazard="earthquake">
+                <div class="hazard-header earthquake-gradient">
+                    <div class="hazard-icon-wrapper">
+                        <img src="Data/earthquake_ic.png" alt="Earthquake" class="hazard-img">
+                    </div>
+                    <span class="hazard-name">Earthquake</span>
+                </div>
+            </div>
+
+            <!-- Drought -->
+            <div class="hazard-section" data-hazard="drought">
+                <div class="hazard-header drought-gradient">
+                    <div class="hazard-icon-wrapper">
+                        <img src="Data/drought_ic.png" alt="Drought" class="hazard-img">
+                    </div>
+                    <span class="hazard-name">Drought</span>
+                </div>
+            </div>
+
+            <!-- Heatwave -->
+            <div class="hazard-section" data-hazard="heatwave">
+                <div class="hazard-header heatwave-gradient">
+                    <div class="hazard-icon-wrapper">
+                        <img src="Data/heatwave_ic.png" alt="Heatwave" class="hazard-img">
+                    </div>
+                    <span class="hazard-name">Heatwave</span>
+                </div>
+            </div>
+
+            <!-- GLOF Emergencies -->
+            <div class="hazard-section" data-hazard="glof-emergencies">
+                <div class="hazard-header Glof-gradient">
+                    <div class="hazard-icon-wrapper">
+                        <img src="Data/glof_ic.png" alt="Glof" class="hazard-img">
+                    </div>
+                    <span class="hazard-name">GLOF Emergencies</span>
+                </div>
+            </div>
+
+            <!-- Fire Emergencies -->
+            <div class="hazard-section" data-hazard="fire-emergencies">
+                <div class="hazard-header Fire-gradient">
+                    <div class="hazard-icon-wrapper">
+                        <img src="Data/fires_ic.png" alt="Fire" class="hazard-img">
+                    </div>
+                    <span class="hazard-name">Fire Emergencies</span>
+                </div>
+            </div>
+
+            <!-- Coastal Emergencies -->
+            <div class="hazard-section" data-hazard="coastal-emergencies">
+                <div class="hazard-header Coastal-gradient">
+                    <div class="hazard-icon-wrapper">
+                        <img src="Data/coastal_ic.png" alt="Coastal" class="hazard-img">
+                    </div>
+                    <span class="hazard-name">Coastal Emergencies</span>
+                </div>
+            </div>
+
+            <!-- Simex Emergencies -->
+            <div class="hazard-section" data-hazard="simex-emergencies">
+                <div class="hazard-header Simex-gradient" id="simexTrigger">
+                    <div class="hazard-icon-wrapper">
+                        <img src="Data/simex_ic.png" alt="Simex" class="hazard-img">
+                    </div>
+                    <span class="hazard-name">Simex Emergencies</span>
+                </div>
+            </div>
+
+            <!-- Hazard Calendars -->
+            <div class="hazard-section" data-hazard="hazard-calendars">
+                <div class="hazard-header calendar-gradient" id="hazardCalendarsTrigger">
+                    <div class="hazard-icon-wrapper">
+                        <img src="Data/calendar_ic.png" alt="Calendar" class="hazard-img">
+                    </div>
+                    <span class="hazard-name">Hazard Calendars</span>
+                </div>
+            </div>
+
+            <!-- General Videos -->
+            <div class="hazard-section" data-hazard="general-videos">
+                <div class="hazard-header video-gradient" id="generalVideosTrigger">
+                    <div class="hazard-icon-wrapper">
+                        <img src="Data/videos_ic.png" alt="Videos" class="hazard-img">
+                    </div>
+                    <span class="hazard-name">General Videos</span>
+                </div>
+            </div>
+
+                </div> <!-- end tech-ew-content -->
+            </div> <!-- end tech-ew-section -->
+
+            <!-- Boundaries -->
+            <div class="hazard-section nav-hidden" id="boundariesSection" data-hazard="boundaries">
+                <div class="hazard-header boundaries-gradient">
+                    <div class="hazard-icon-wrapper">
+                        <img src="Data/map.png" alt="Boundaries" class="hazard-img">
+                    </div>
+                    <span class="hazard-name">Boundaries</span>
+                </div>
+                <div class="province-list">
+                    <div class="province-item" data-boundary="provincial">
+                        <span>Provincial Boundary</span>
+                    </div>
+                    <div class="province-item" data-boundary="district">
+                        <span>District Boundary</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Map Container -->
+        <div id="map" class="map-container">
+
+            <!-- ============================================ -->
+            <!-- SIMEX VIDEO PANEL -->
+            <!-- ============================================ -->
+            <div id="simexVideoPanel" class="video-panel simex-panel">
+                <div class="panel-header simex-header">
+                    <div class="panel-title">
+                        <img src="Data/simex_ic.png" alt="Simex" class="panel-icon">
+                        <h3>Simex Emergency Videos</h3>
+                    </div>
+                    <div class="panel-header-actions">
+                        <button class="add-video-btn" data-panel="simex">
+                            <i class="fas fa-plus"></i> Add Video
+                        </button>
+                        <button class="panel-close" id="closeSimexPanel">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="panel-content">
+                    <div class="video-grid">
+                        <!-- Simex Video Item 1 -->
+                        <div class="video-item" data-panel="simex">
+                            <div class="video-thumbnail">
+                                <video class="preview-video" preload="metadata" muted>
+                                    <source src="Portalvideos/Cyclone_simex-A1.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-overlay">
+                                    <button class="play-btn" data-action="preview">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="video-info">
+                                <h4 class="video-title">Cyclone Simex Exercise 2024</h4>
+                                <p class="video-description">Emergency response simulation</p>
+                            </div>
+                            <div class="video-actions">
+                                <button class="enlarge-btn" 
+                                        data-video="Portalvideos/Cyclone_simex-A1.mp4"
+                                        data-title="Cyclone Simex Exercise 2024">
+                                    <i class="fas fa-expand"></i> Enlarge
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Simex Video Item 2 -->
+                        <div class="video-item" data-panel="simex">
+                            <div class="video-thumbnail">
+                                <video class="preview-video" preload="metadata" muted>
+                                    <source src="Portalvideos/Darkut_Updated.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-overlay">
+                                    <button class="play-btn" data-action="preview">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="video-info">
+                                <h4 class="video-title">Darkut Disaster Management</h4>
+                                <p class="video-description">Team coordination drills</p>
+                            </div>
+                            <div class="video-actions">
+                                <button class="enlarge-btn" 
+                                        data-video="Portalvideos/Darkut_Updated.mp4"
+                                        data-title="Darkut Disaster Management">
+                                    <i class="fas fa-expand"></i> Enlarge
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Simex Video Item 3 -->
+                        <div class="video-item" data-panel="simex">
+                            <div class="video-thumbnail">
+                                <video class="preview-video" preload="metadata" muted>
+                                    <source src="Portalvideos/EQ_International_Simex Previous.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-overlay">
+                                    <button class="play-btn" data-action="preview">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="video-info">
+                                <h4 class="video-title">Earthquake International Simex</h4>
+                                <p class="video-description">Search and rescue procedures</p>
+                            </div>
+                            <div class="video-actions">
+                                <button class="enlarge-btn" 
+                                        data-video="Portalvideos/EQ_International_Simex Previous.mp4"
+                                        data-title="Earthquake International Simex">
+                                    <i class="fas fa-expand"></i> Enlarge
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Simex Video Item 4 -->
+                        <div class="video-item" data-panel="simex">
+                            <div class="video-thumbnail">
+                                <video class="preview-video" preload="metadata" muted>
+                                    <source src="Portalvideos/EQ_International_Simex.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-overlay">
+                                    <button class="play-btn" data-action="preview">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="video-info">
+                                <h4 class="video-title">Evacuation Procedures</h4>
+                                <p class="video-description">Mass evacuation protocols</p>
+                            </div>
+                            <div class="video-actions">
+                                <button class="enlarge-btn" 
+                                        data-video="Portalvideos/EQ_International_Simex.mp4"
+                                        data-title="Evacuation Procedures">
+                                    <i class="fas fa-expand"></i> Enlarge
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Simex Video Item 5 -->
+                        <div class="video-item" data-panel="simex">
+                            <div class="video-thumbnail">
+                                <video class="preview-video" preload="metadata" muted>
+                                    <source src="Portalvideos/Forest_Fire_Simex-AI.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-overlay">
+                                    <button class="play-btn" data-action="preview">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="video-info">
+                                <h4 class="video-title">Forest Fire Response</h4>
+                                <p class="video-description">Field hospital setup</p>
+                            </div>
+                            <div class="video-actions">
+                                <button class="enlarge-btn" 
+                                        data-video="Portalvideos/Forest_Fire_Simex-AI.mp4"
+                                        data-title="Forest Fire Response">
+                                    <i class="fas fa-expand"></i> Enlarge
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Simex Video Item 6 -->
+                        <div class="video-item" data-panel="simex">
+                            <div class="video-thumbnail">
+                                <video class="preview-video" preload="metadata" muted>
+                                    <source src="Portalvideos/Heat_Wave_Simex-AI.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-overlay">
+                                    <button class="play-btn" data-action="preview">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="video-info">
+                                <h4 class="video-title">Heat Wave Management</h4>
+                                <p class="video-description">Crisis management coordination</p>
+                            </div>
+                            <div class="video-actions">
+                                <button class="enlarge-btn" 
+                                        data-video="Portalvideos/Heat_Wave_Simex-AI.mp4"
+                                        data-title="Heat Wave Management">
+                                    <i class="fas fa-expand"></i> Enlarge
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Simex Video Item 7 -->
+                        <div class="video-item" data-panel="simex">
+                            <div class="video-thumbnail">
+                                <video class="preview-video" preload="metadata" muted>
+                                    <source src="Portalvideos/Landslide.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-overlay">
+                                    <button class="play-btn" data-action="preview">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="video-info">
+                                <h4 class="video-title">Landslide Response</h4>
+                                <p class="video-description">Emergency evacuation procedures</p>
+                            </div>
+                            <div class="video-actions">
+                                <button class="enlarge-btn" 
+                                        data-video="Portalvideos/Landslide.mp4"
+                                        data-title="Landslide Response">
+                                    <i class="fas fa-expand"></i> Enlarge
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Simex Video Item 8 -->
+                        <div class="video-item" data-panel="simex">
+                            <div class="video-thumbnail">
+                                <video class="preview-video" preload="metadata" muted>
+                                    <source src="Portalvideos/National Simex Riverine 20 May.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-overlay">
+                                    <button class="play-btn" data-action="preview">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="video-info">
+                                <h4 class="video-title">National Riverine Simex</h4>
+                                <p class="video-description">Flood response coordination</p>
+                            </div>
+                            <div class="video-actions">
+                                <button class="enlarge-btn" 
+                                        data-video="Portalvideos/National Simex Riverine 20 May.mp4"
+                                        data-title="National Riverine Simex">
+                                    <i class="fas fa-expand"></i> Enlarge
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Simex Video Item 9 -->
+                        <div class="video-item" data-panel="simex">
+                            <div class="video-thumbnail">
+                                <video class="preview-video" preload="metadata" muted>
+                                    <source src="Portalvideos/Sea_Water_Intrusion_Simex-A1.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-overlay">
+                                    <button class="play-btn" data-action="preview">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="video-info">
+                                <h4 class="video-title">Sea Water Intrusion Simex</h4>
+                                <p class="video-description">Coastal emergency response</p>
+                            </div>
+                            <div class="video-actions">
+                                <button class="enlarge-btn" 
+                                        data-video="Portalvideos/Sea_Water_Intrusion_Simex-A1.mp4"
+                                        data-title="Sea Water Intrusion Simex">
+                                    <i class="fas fa-expand"></i> Enlarge
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Simex Video Item 10 -->
+                        <div class="video-item" data-panel="simex">
+                            <div class="video-thumbnail">
+                                <video class="preview-video" preload="metadata" muted>
+                                    <source src="Portalvideos/Urban Hyderabad.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-overlay">
+                                    <button class="play-btn" data-action="preview">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="video-info">
+                                <h4 class="video-title">Urban Hyderabad Exercise</h4>
+                                <p class="video-description">Urban disaster management</p>
+                            </div>
+                            <div class="video-actions">
+                                <button class="enlarge-btn" 
+                                        data-video="Portalvideos/Urban Hyderabad.mp4"
+                                        data-title="Urban Hyderabad Exercise">
+                                    <i class="fas fa-expand"></i> Enlarge
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- Simex Video Modal -->
+            <div id="simexVideoModal" class="video-modal">
+                <div class="video-modal-content">
+                    <div class="video-modal-header simex-modal-header">
+                        <h3 id="simexModalTitle">Simex Video</h3>
+                        <button id="closeSimexModal" class="close-btn">&times;</button>
+                    </div>
+                    <div class="video-wrapper">
+                        <video id="simexModalVideo" controls>
+                            <source src="" type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>
+                    </div>
+                    <button id="simexFullscreenBtn" class="fullscreen-btn">
+                        <i class="fas fa-expand"></i>
+                        Fullscreen
+                    </button>
+                </div>
+            </div>
+
+            <!-- ============================================ -->
+            <!-- HAZARD CALENDARS VIDEO PANEL -->
+            <!-- ============================================ -->
+            <div id="calendarsVideoPanel" class="video-panel calendars-panel">
+                <div class="panel-header calendars-header">
+                    <div class="panel-title">
+                        <img src="Data/calendar_ic.png" alt="Calendar" class="panel-icon">
+                        <h3>Hazard Calendars</h3>
+                    </div>
+                    <div class="panel-header-actions">
+                        <button class="add-video-btn" data-panel="calendars">
+                            <i class="fas fa-plus"></i> Add Video
+                        </button>
+                        <button class="panel-close" id="closeCalendarsPanel">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="panel-content">
+                    <div class="video-grid">
+
+                        <!-- Calendar Video 1 -->
+                        <div class="video-item" data-panel="calendars">
+                            <div class="video-thumbnail">
+                                <video class="preview-video" preload="metadata" muted>
+                                    <source src="Portalvideos/GDC_Complete.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-overlay">
+                                    <button class="play-btn" data-action="preview">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="video-info">
+                                <h4 class="video-title">Snow Emergency Calendar 2024</h4>
+                                <p class="video-description">Monthly snow hazard predictions and safety guidelines</p>
+                            </div>
+                            <div class="video-actions">
+                                <button class="enlarge-btn" 
+                                        data-video="Portalvideos/GDC_Complete.mp4"
+                                        data-title="Snow Emergency Calendar 2024">
+                                    <i class="fas fa-expand"></i> Enlarge
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Calendar Video 2 -->
+                        <div class="video-item" data-panel="calendars">
+                            <div class="video-thumbnail">
+                                <video class="preview-video" preload="metadata" muted>
+                                    <source src="Portalvideos/Hazard_Calendar-2026_Complete.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-overlay">
+                                    <button class="play-btn" data-action="preview">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="video-info">
+                                <h4 class="video-title">Flood Risk Calendar 2024</h4>
+                                <p class="video-description">Monsoon season predictions and flood preparedness timeline</p>
+                            </div>
+                            <div class="video-actions">
+                                <button class="enlarge-btn" 
+                                        data-video="Portalvideos/Hazard_Calendar-2026_Complete.mp4"
+                                        data-title="Flood Risk Calendar 2024">
+                                    <i class="fas fa-expand"></i> Enlarge
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Calendar Video 3 -->
+                        <div class="video-item" data-panel="calendars">
+                            <div class="video-thumbnail">
+                                <video class="preview-video" preload="metadata" muted>
+                                    <source src="Portalvideos/NDC_Complete.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-overlay">
+                                    <button class="play-btn" data-action="preview">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="video-info">
+                                <h4 class="video-title">Earthquake Risk Calendar 2024</h4>
+                                <p class="video-description">Seismic activity patterns and preparedness timeline</p>
+                            </div>
+                            <div class="video-actions">
+                                <button class="enlarge-btn" 
+                                        data-video="Portalvideos/NDC_Complete.mp4"
+                                        data-title="Earthquake Risk Calendar 2024">
+                                    <i class="fas fa-expand"></i> Enlarge
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Calendar Video 4 -->
+                        <div class="video-item" data-panel="calendars">
+                            <div class="video-thumbnail">
+                                <video class="preview-video" preload="metadata" muted>
+                                    <source src="CalendarVideos/heatwave-calendar.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-overlay">
+                                    <button class="play-btn" data-action="preview">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="video-info">
+                                <h4 class="video-title">Heat Wave Calendar 2024</h4>
+                                <p class="video-description">Temperature patterns and heat safety guidelines</p>
+                            </div>
+                            <div class="video-actions">
+                                <button class="enlarge-btn" 
+                                        data-video="CalendarVideos/heatwave-calendar.mp4"
+                                        data-title="Heat Wave Calendar 2024">
+                                    <i class="fas fa-expand"></i> Enlarge
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Calendar Video 5 -->
+                        <div class="video-item" data-panel="calendars">
+                            <div class="video-thumbnail">
+                                <video class="preview-video" preload="metadata" muted>
+                                    <source src="CalendarVideos/drought-calendar.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-overlay">
+                                    <button class="play-btn" data-action="preview">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="video-info">
+                                <h4 class="video-title">Drought Risk Calendar 2024</h4>
+                                <p class="video-description">Water scarcity patterns and conservation measures</p>
+                            </div>
+                            <div class="video-actions">
+                                <button class="enlarge-btn" 
+                                        data-video="CalendarVideos/drought-calendar.mp4"
+                                        data-title="Drought Risk Calendar 2024">
+                                    <i class="fas fa-expand"></i> Enlarge
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Calendar Video 6 -->
+                        <div class="video-item" data-panel="calendars">
+                            <div class="video-thumbnail">
+                                <video class="preview-video" preload="metadata" muted>
+                                    <source src="CalendarVideos/landslide-calendar.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-overlay">
+                                    <button class="play-btn" data-action="preview">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="video-info">
+                                <h4 class="video-title">Landslide Risk Calendar 2024</h4>
+                                <p class="video-description">Rainfall patterns and slope stability monitoring</p>
+                            </div>
+                            <div class="video-actions">
+                                <button class="enlarge-btn" 
+                                        data-video="CalendarVideos/landslide-calendar.mp4"
+                                        data-title="Landslide Risk Calendar 2024">
+                                    <i class="fas fa-expand"></i> Enlarge
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Calendar Video 7 -->
+                        <div class="video-item" data-panel="calendars">
+                            <div class="video-thumbnail">
+                                <video class="preview-video" preload="metadata" muted>
+                                    <source src="CalendarVideos/glof-calendar.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-overlay">
+                                    <button class="play-btn" data-action="preview">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="video-info">
+                                <h4 class="video-title">GLOF Risk Calendar 2024</h4>
+                                <p class="video-description">Glacial lake monitoring and early warning systems</p>
+                            </div>
+                            <div class="video-actions">
+                                <button class="enlarge-btn" 
+                                        data-video="CalendarVideos/glof-calendar.mp4"
+                                        data-title="GLOF Risk Calendar 2024">
+                                    <i class="fas fa-expand"></i> Enlarge
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Calendar Video 8 -->
+                        <div class="video-item" data-panel="calendars">
+                            <div class="video-thumbnail">
+                                <video class="preview-video" preload="metadata" muted>
+                                    <source src="CalendarVideos/fire-calendar.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-overlay">
+                                    <button class="play-btn" data-action="preview">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="video-info">
+                                <h4 class="video-title">Fire Risk Calendar 2024</h4>
+                                <p class="video-description">Fire weather conditions and prevention strategies</p>
+                            </div>
+                            <div class="video-actions">
+                                <button class="enlarge-btn" 
+                                        data-video="CalendarVideos/fire-calendar.mp4"
+                                        data-title="Fire Risk Calendar 2024">
+                                    <i class="fas fa-expand"></i> Enlarge
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Calendar Video 9 -->
+                        <div class="video-item" data-panel="calendars">
+                            <div class="video-thumbnail">
+                                <video class="preview-video" preload="metadata" muted>
+                                    <source src="CalendarVideos/coastal-calendar.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-overlay">
+                                    <button class="play-btn" data-action="preview">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="video-info">
+                                <h4 class="video-title">Coastal Hazards Calendar 2024</h4>
+                                <p class="video-description">Cyclone season and coastal emergency preparedness</p>
+                            </div>
+                            <div class="video-actions">
+                                <button class="enlarge-btn" 
+                                        data-video="CalendarVideos/coastal-calendar.mp4"
+                                        data-title="Coastal Hazards Calendar 2024">
+                                    <i class="fas fa-expand"></i> Enlarge
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Calendar Video 10 -->
+                        <div class="video-item" data-panel="calendars">
+                            <div class="video-thumbnail">
+                                <video class="preview-video" preload="metadata" muted>
+                                    <source src="CalendarVideos/smog-calendar.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-overlay">
+                                    <button class="play-btn" data-action="preview">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="video-info">
+                                <h4 class="video-title">Smog/Fog Calendar 2024</h4>
+                                <p class="video-description">Air quality patterns and health safety measures</p>
+                            </div>
+                            <div class="video-actions">
+                                <button class="enlarge-btn" 
+                                        data-video="CalendarVideos/smog-calendar.mp4"
+                                        data-title="Smog/Fog Calendar 2024">
+                                    <i class="fas fa-expand"></i> Enlarge
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hazard Calendars Video Modal -->
+            <div id="calendarsVideoModal" class="video-modal">
+                <div class="video-modal-content">
+                    <div class="video-modal-header calendars-modal-header">
+                        <h3 id="calendarsModalTitle">Hazard Calendar Video</h3>
+                        <button id="closeCalendarsModal" class="close-btn">&times;</button>
+                    </div>
+                    <div class="video-wrapper">
+                        <video id="calendarsModalVideo" controls>
+                            <source src="" type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>
+                    </div>
+                    <button id="calendarsFullscreenBtn" class="fullscreen-btn">
+                        <i class="fas fa-expand"></i> Fullscreen
+                    </button>
+                </div>
+            </div>
+
+            <!-- ============================================ -->
+            <!-- GENERAL VIDEOS PANEL -->
+            <!-- ============================================ -->
+            <div id="generalVideoPanel" class="video-panel general-panel">
+                <div class="panel-header general-header">
+                    <div class="panel-title">
+                        <img src="Data/videos_ic.png" alt="Videos" class="panel-icon">
+                        <h3>General Safety Videos</h3>
+                    </div>
+                    <div class="panel-header-actions">
+                        <button class="add-video-btn" data-panel="general">
+                            <i class="fas fa-plus"></i> Add Video
+                        </button>
+                        <button class="panel-close" id="closeGeneralPanel">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="panel-content">
+                    <div class="video-grid">
+
+                        <!-- General Video 1 -->
+                        <div class="video-item" data-panel="general">
+                            <div class="video-thumbnail">
+                                <video class="preview-video" preload="metadata" muted>
+                                    <source src="GeneralVideos/disaster-preparedness.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-overlay">
+                                    <button class="play-btn" data-action="preview">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="video-info">
+                                <h4 class="video-title">Disaster Preparedness Guide</h4>
+                                <p class="video-description">Essential tips for emergency preparedness and family safety planning</p>
+                            </div>
+                            <div class="video-actions">
+                                <button class="enlarge-btn" 
+                                        data-video="GeneralVideos/disaster-preparedness.mp4"
+                                        data-title="Disaster Preparedness Guide">
+                                    <i class="fas fa-expand"></i> Enlarge
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- General Video 2 -->
+                        <div class="video-item" data-panel="general">
+                            <div class="video-thumbnail">
+                                <video class="preview-video" preload="metadata" muted>
+                                    <source src="GeneralVideos/first-aid-basics.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-overlay">
+                                    <button class="play-btn" data-action="preview">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="video-info">
+                                <h4 class="video-title">First Aid & Emergency Response</h4>
+                                <p class="video-description">Basic first aid techniques and emergency medical response procedures</p>
+                            </div>
+                            <div class="video-actions">
+                                <button class="enlarge-btn" 
+                                        data-video="GeneralVideos/first-aid-basics.mp4"
+                                        data-title="First Aid & Emergency Response">
+                                    <i class="fas fa-expand"></i> Enlarge
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- General Video 3 -->
+                        <div class="video-item" data-panel="general">
+                            <div class="video-thumbnail">
+                                <video class="preview-video" preload="metadata" muted>
+                                    <source src="GeneralVideos/evacuation-procedures.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-overlay">
+                                    <button class="play-btn" data-action="preview">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="video-info">
+                                <h4 class="video-title">Safe Evacuation Procedures</h4>
+                                <p class="video-description">How to evacuate safely during emergencies and find shelter</p>
+                            </div>
+                            <div class="video-actions">
+                                <button class="enlarge-btn" 
+                                        data-video="GeneralVideos/evacuation-procedures.mp4"
+                                        data-title="Safe Evacuation Procedures">
+                                    <i class="fas fa-expand"></i> Enlarge
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- General Video 4 -->
+                        <div class="video-item" data-panel="general">
+                            <div class="video-thumbnail">
+                                <video class="preview-video" preload="metadata" muted>
+                                    <source src="GeneralVideos/community-awareness.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-overlay">
+                                    <button class="play-btn" data-action="preview">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="video-info">
+                                <h4 class="video-title">Community Disaster Awareness</h4>
+                                <p class="video-description">Building community resilience and disaster awareness programs</p>
+                            </div>
+                            <div class="video-actions">
+                                <button class="enlarge-btn" 
+                                        data-video="GeneralVideos/community-awareness.mp4"
+                                        data-title="Community Disaster Awareness">
+                                    <i class="fas fa-expand"></i> Enlarge
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- General Video 5 -->
+                        <div class="video-item" data-panel="general">
+                            <div class="video-thumbnail">
+                                <video class="preview-video" preload="metadata" muted>
+                                    <source src="GeneralVideos/emergency-communication.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-overlay">
+                                    <button class="play-btn" data-action="preview">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="video-info">
+                                <h4 class="video-title">Emergency Communication Systems</h4>
+                                <p class="video-description">Using emergency communication channels and alert systems effectively</p>
+                            </div>
+                            <div class="video-actions">
+                                <button class="enlarge-btn" 
+                                        data-video="GeneralVideos/emergency-communication.mp4"
+                                        data-title="Emergency Communication Systems">
+                                    <i class="fas fa-expand"></i> Enlarge
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- General Videos Modal -->
+            <div id="generalVideoModal" class="video-modal">
+                <div class="video-modal-content">
+                    <div class="video-modal-header general-modal-header">
+                        <h3 id="generalModalTitle">General Video</h3>
+                        <button id="closeGeneralModal" class="close-btn">&times;</button>
+                    </div>
+                    <div class="video-wrapper">
+                        <video id="generalModalVideo" controls>
+                            <source src="" type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>
+                    </div>
+                    <button id="generalFullscreenBtn" class="fullscreen-btn">
+                        <i class="fas fa-expand"></i> Fullscreen
+                    </button>
+                </div>
+            </div>
+
+            <!-- ============================================ -->
+            <!-- MAP CONTROL TOOLBAR -->
+            <!-- ============================================ -->
+            <div class="map-toolbar" id="mapToolbar">
+                <div class="toolbar-view-toggle">
+                    <button class="toolbar-view-btn active" id="view2DBtn" type="button" data-view="2d">2D</button>
+                    <button class="toolbar-view-btn" id="view3DBtn" type="button" data-view="3d">3D</button>
+                </div>
+
+                <button class="toolbar-icon-btn" id="toolbarLayersBtn" type="button" title="Layers">
+                    <i class="fas fa-layer-group"></i>
+                </button>
+
+                <div class="toolbar-basemap-wrap">
+                    <button class="toolbar-icon-btn" id="toolbarBasemapBtn" type="button" title="Basemap style">
+                        <i class="fas fa-th-large"></i>
+                    </button>
+
+                    <!-- Basemap style picker (opens to the left) -->
+                    <div class="basemap-options" id="basemapOptions">
+                        <button class="basemap-option active" data-style="satellite">
+                            <span class="basemap-preview"
+                                style="background: url('https://api.mapbox.com/styles/v1/mapbox/satellite-v9/static/0,0,1/100x80?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw') center/cover"></span>
+                            <span class="basemap-name">Satellite</span>
+                        </button>
+                        <button class="basemap-option" data-style="streets">
+                            <span class="basemap-preview" style="background: #4a5568"></span>
+                            <span class="basemap-name">Streets</span>
+                        </button>
+                        <button class="basemap-option" data-style="dark">
+                            <span class="basemap-preview" style="background: #1a202c"></span>
+                            <span class="basemap-name">Dark</span>
+                        </button>
+                        <button class="basemap-option" data-style="light">
+                            <span class="basemap-preview"
+                                style="background: #f7fafc; border: 1px solid #cbd5e0"></span>
+                            <span class="basemap-name">Light</span>
+                        </button>
+                        <button class="basemap-option" data-style="outdoors">
+                            <span class="basemap-preview" style="background: #2d3748"></span>
+                            <span class="basemap-name">Outdoors</span>
+                        </button>
+                        <button class="basemap-option" data-style="terrain">
+                            <span class="basemap-preview"
+                                style="background: linear-gradient(to bottom, #8b7355, #6b9b6e)"></span>
+                            <span class="basemap-name">Terrain</span>
+                        </button>
+                    </div>
+                </div>
+
+                <button class="toolbar-icon-btn" id="toolbarRotateBtn" type="button" title="Rotate globe">
+                    <i class="fas fa-arrows-rotate"></i>
+                </button>
+
+                <button class="toolbar-icon-btn" id="toolbarSpeedBtn" type="button" title="Camera speed">
+                    <i class="fas fa-gauge-high"></i>
+                    <span class="toolbar-badge" id="speedBadge">1x</span>
+                </button>
+
+                <button class="toolbar-icon-btn" id="toolbarResetViewBtn" type="button" title="Reset view">
+                    <i class="fas fa-crosshairs"></i>
+                </button>
+
+                <button class="toolbar-icon-btn" id="toolbarFullscreenBtn" type="button" title="Fullscreen">
+                    <i class="fas fa-expand"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Regular Video Modal -->
+        <div id="videoModal" class="video-modal">
+            <div class="video-modal-content">
+                <div class="video-modal-header">
+                    <h3 id="modalHazardName">Hazard Name</h3>
+                    <button id="closeModal" class="close-btn">&times;</button>
+                </div>
+                <div class="video-wrapper">
+                    <video id="modalVideo" controls>
+                        <source src="" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+                <button id="fullscreenBtn" class="fullscreen-btn">
+                    <i class="fas fa-expand"></i>
+                    Fullscreen
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Video Modal -->
+    <div id="addVideoModal" class="add-video-modal">
+        <div class="add-video-modal-content">
+            <div class="add-video-modal-header">
+                <h3><i class="fas fa-plus-circle"></i> Add New Video</h3>
+                <button id="closeAddVideoModal" class="close-btn">&times;</button>
+            </div>
+            <form id="addVideoForm" class="add-video-form">
+                <input type="hidden" id="addVideoPanel" value="">
+                <div class="form-group">
+                    <label for="addVideoTitle">Video Title <span class="required">*</span></label>
+                    <input type="text" id="addVideoTitle" placeholder="e.g. Flood Response Training 2025" required>
+                </div>
+                <div class="form-group">
+                    <label for="addVideoDescription">Description</label>
+                    <input type="text" id="addVideoDescription" placeholder="e.g. Field coordination procedures">
+                </div>
+                <div class="form-group">
+                    <label for="addVideoFile">Video File <span class="required">*</span></label>
+                    <div class="file-input-wrapper">
+                        <input type="file" id="addVideoFile" accept="video/mp4,video/*" required>
+                        <div class="file-input-display">
+                            <i class="fas fa-film"></i>
+                            <span id="fileInputLabel">Click to browse or drag a video file</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" id="cancelAddVideo" class="cancel-btn">Cancel</button>
+                    <button type="submit" class="submit-btn">
+                        <i class="fas fa-plus"></i> Add Video
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- HAZARD DETAILS PANEL (driven by the AI assistant) -->
+    <!-- ============================================ -->
+    <div class="hazard-details-panel" id="hazardDetailsPanel"></div>
+
+    <!-- ============================================ -->
+    <!-- AI ASSISTANT -->
+    <!-- ============================================ -->
+    <button class="ai-fab" id="aiFabBtn" type="button" title="AI Assistant">
+        <i class="fas fa-robot"></i>
+    </button>
+
+    <div class="ai-chat-panel" id="aiChatPanel">
+        <div class="ai-chat-header">
+            <div class="ai-chat-title">
+                <i class="fas fa-robot"></i>
+                <span>AI Assistant</span>
+            </div>
+            <div class="ai-chat-header-actions">
+                <button class="ai-chat-clear" id="aiChatClear" type="button" title="Clear chat">
+                    <i class="fas fa-trash"></i>
+                </button>
+                <button class="ai-chat-close" id="aiChatClose" type="button" title="Close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        <div class="ai-chat-messages" id="aiChatMessages">
+            <div class="ai-msg ai-msg-bot">Hi! Try "show flood zones", "tour earthquake sites", "find a video about landslides", or "summarize flood risk".</div>
+        </div>
+        <div class="ai-chat-quick-actions" id="aiQuickActions"></div>
+        <div class="ai-chat-input-row">
+            <button class="ai-chat-mic" id="aiMicBtn" type="button" title="Speak">
+                <i class="fas fa-microphone"></i>
+            </button>
+            <input type="text" id="aiChatInput" placeholder="Ask about hazards, risk, or the map..." autocomplete="off">
+            <button class="ai-chat-send" id="aiChatSend" type="button" title="Send">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="mapinit.js"></script>
+    <script src="maplayers.js"></script>
+    <script src="boundaries.js"></script>
+    <script src="google-drive-videos.js"></script>
+    <script src="controls.js"></script>
+    <script src="ai-assistant.js"></script>
+</body>
+
+</html>

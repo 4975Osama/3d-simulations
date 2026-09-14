@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23082d52'/%3E%3Cpath d='M3 20q5-5 10 0t10 0 6-3' stroke='%234cc3ff' stroke-width='3' fill='none'/%3E%3C/svg%3E" />
+<title>Pakistan Rivers — animated WebGL water surface</title>
+<link rel="stylesheet" href="./vendor/maplibre-gl.css" />
+<style>
+  :root {
+    --panel: rgba(11, 16, 24, 0.82);
+    --line: rgba(255, 255, 255, 0.12);
+    --txt: #e8eef7;
+    --dim: #93a3b8;
+    --accent: #4cc3ff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0a0d12;
+    font: 13px/1.45 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--txt); }
+  #map { position: absolute; inset: 0; }
+  #water { position: absolute; top: 0; left: 0; pointer-events: none; }
+
+  .panel { position: absolute; background: var(--panel); backdrop-filter: blur(14px);
+    border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 34px rgba(0,0,0,.45); }
+
+  #ui { top: 12px; left: 12px; width: 268px; padding: 14px 14px 12px; z-index: 5; }
+  #ui h1 { margin: 0 0 2px; font-size: 15px; letter-spacing: .2px; font-weight: 650; }
+  #ui .sub { color: var(--dim); font-size: 11.5px; margin-bottom: 12px; }
+  .grp { margin-bottom: 11px; }
+  .lbl { font-size: 10.5px; text-transform: uppercase; letter-spacing: .09em; color: var(--dim); margin-bottom: 5px; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; }
+  button, .seg { font: inherit; font-size: 12px; color: var(--txt); background: rgba(255,255,255,.06);
+    border: 1px solid var(--line); border-radius: 8px; padding: 5px 9px; cursor: pointer; transition: .12s; }
+  button:hover { background: rgba(255,255,255,.13); }
+  button.on { background: rgba(76,195,255,.22); border-color: rgba(76,195,255,.55); color: #dff2ff; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  .val { float: right; color: var(--accent); font-variant-numeric: tabular-nums; }
+  #hud { bottom: 12px; left: 12px; padding: 9px 12px; font-size: 11.5px; color: var(--dim);
+    font-variant-numeric: tabular-nums; z-index: 5; line-height: 1.6; }
+  #hud b { color: var(--txt); font-weight: 600; }
+  #legend { bottom: 12px; right: 12px; padding: 10px 12px; z-index: 5; font-size: 11.5px; }
+  .ramp { width: 150px; height: 9px; border-radius: 5px; margin: 5px 0 3px;
+    background: linear-gradient(90deg, #eaf6ff, #2b6698, #082d52); }
+  .rampx { display: flex; justify-content: space-between; color: var(--dim); font-size: 10px; }
+  .marker { font-size: 11px; font-weight: 600; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.9), 0 0 8px rgba(0,0,0,.7);
+    white-space: nowrap; transform: translate(6px, -50%); pointer-events: none; }
+  .marker.light { color: #26313f; text-shadow: 0 1px 2px rgba(255,255,255,.95), 0 0 7px rgba(255,255,255,.8); }
+  .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; display: inline-block;
+    margin-right: 4px; vertical-align: middle; opacity: .8; }
+  #boot { position: absolute; inset: 0; display: grid; place-items: center; z-index: 20;
+    background: #0a0d12; color: var(--dim); transition: opacity .5s; }
+  #tourcard { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+    width: min(620px, calc(100% - 24px)); padding: 14px 16px 12px; z-index: 8;
+    background: var(--panel); backdrop-filter: blur(14px); border: 1px solid var(--line);
+    border-radius: 12px; box-shadow: 0 10px 34px rgba(0,0,0,.5); }
+  #tourcard .tk { display: flex; justify-content: space-between; align-items: center;
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: .1em;
+    color: var(--accent); margin-bottom: 4px; }
+  #tourcard .tt { font-size: 15px; font-weight: 650; margin-bottom: 4px; }
+  #tourcard .tb { color: var(--dim); font-size: 12.5px; line-height: 1.5; }
+  #tourcard .tbtns { display: flex; gap: 6px; margin-top: 10px; align-items: center; }
+  #tourcard .tsp { flex: 1; }
+  #tourcard button:disabled { opacity: .35; cursor: default; }
+  #tourcard #tk-dots i { display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    background: rgba(255,255,255,.18); margin-left: 4px; vertical-align: middle; }
+  #tourcard #tk-dots i.on { background: var(--accent); }
+  .maplibregl-ctrl-group { background: var(--panel) !important; border: 1px solid var(--line); }
+  .maplibregl-ctrl-group button + button { border-top: 1px solid var(--line); }
+  .maplibregl-ctrl-icon { filter: invert(1) hue-rotate(180deg) brightness(1.4); }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div id="ui" class="panel">
+  <h1>Indus Basin — live water surface</h1>
+  <div class="sub">WebGL surface-fill layer over MapLibre · OSM river geometry</div>
+
+  <div class="grp">
+    <div class="lbl">Basemap / palette</div>
+    <div class="row" id="styles">
+      <button data-style="terrain" class="on">terrain</button>
+      <button data-style="satellite">satellite</button>
+      <button data-style="dark">dark</button>
+      <button data-style="streets">streets</button>
+    </div>
+  </div>
+
+  <div class="grp">
+    <div class="lbl">Animation <span class="val" id="spdv">1.0×</span></div>
+    <input type="range" id="speed" min="0" max="3" step="0.05" value="1" />
+    <div class="row" style="margin-top:7px">
+      <button id="play" class="on">⏸ Pause</button>
+      <button id="rain">🌧 Rain</button>
+    </div>
+  </div>
+
+  <div class="grp">
+    <div class="lbl">Water bodies</div>
+    <div class="row" id="bodies">
+      <button data-bodies="rivers" class="on">rivers</button>
+      <button data-bodies="floods">floods 2022</button>
+      <button data-bodies="both">both</button>
+    </div>
+  </div>
+
+  <div class="grp">
+    <div class="lbl">Water look</div>
+    <div class="row" id="looks">
+      <button data-look="realistic" class="on">realistic</button>
+      <button data-look="glassy">glassy</button>
+      <button data-look="spec">spec</button>
+    </div>
+  </div>
+
+  <div class="grp">
+    <div class="lbl">Water opacity <span class="val" id="opv">100%</span></div>
+    <input type="range" id="opacity" min="0" max="100" step="1" value="100" />
+  </div>
+
+  <div class="grp">
+    <div class="lbl">Guided tour</div>
+    <div class="row"><button id="tour" style="flex:1">🎬 Cinematic tour — start</button></div>
+  </div>
+
+  <div class="grp">
+    <div class="lbl">Camera</div>
+    <div class="row">
+      <button id="tilt">Tilt 60°</button>
+      <button id="terrain3d">3D terrain</button>
+      <button id="spin">Orbit</button>
+    </div>
+  </div>
+
+  <div class="grp">
+    <div class="lbl">Fly to</div>
+    <div class="row" id="spots"></div>
+  </div>
+
+  <div class="grp" style="margin-bottom:0">
+    <div class="lbl">Diagnostics</div>
+    <div class="row">
+      <button id="coarse" title="Reproject the mesh through a coarse interpolated lon/lat→screen grid instead of exact per-vertex project() — the classic sliver bug">Coarse projection bug</button>
+    </div>
+  </div>
+</div>
+
+<div id="hud" class="panel">
+  <div><b id="fps">–</b> fps · <b id="drawn">–</b>/<b id="npoly">–</b> polys drawn · <b id="nvert">–</b> verts</div>
+  <div>reproject <b id="pms">–</b> ms (<b id="nproj">–</b> pts) · zoom <b id="zoom">–</b> · pitch <b id="pitch">–</b>°</div>
+</div>
+
+<div id="legend" class="panel">
+  <div style="font-weight:600;margin-bottom:2px">Depth-to-bank (SDF)</div>
+  <div class="ramp"></div>
+  <div class="rampx"><span>bank · foam</span><span>deep</span></div>
+</div>
+
+<div id="boot">loading Indus basin geometry…</div>
+
+<script src="./vendor/maplibre-gl.js"></script>
+<script type="module" src="./app.js"></script>
+</body>
+</html>
