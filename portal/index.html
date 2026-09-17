@@ -4,180 +4,515 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-  <link rel="icon"
-    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23082d52'/%3E%3Cpath d='M3 20q5-5 10 0t10 0 6-3' stroke='%234cc3ff' stroke-width='3' fill='none'/%3E%3C/svg%3E" />
-  <title>3D Simulations Portal — Pakistan Water Surface</title>
+  <link rel="icon" type="image/png" href="./icons/ndma.png" />
+  <title>3D Simulation Portal — Pakistan</title>
   <link rel="stylesheet" href="./vendor/maplibre-gl.css" />
   <style>
     :root {
-      --bg: #04101f;
-      --side: #060f1e;
-      --card: rgba(13, 26, 46, 0.72);
-      --card2: rgba(16, 31, 55, 0.9);
-      --line: rgba(96, 150, 220, 0.14);
-      --line2: rgba(96, 150, 220, 0.28);
-      --txt: #e8eef7;
-      --dim: #8ea5c4;
-      --accent: #38b6ff;
+      --bg: #070d1e;
+      --side: #0b1430;
+      --card: rgba(19, 29, 58, .78);
+      --card2: rgba(12, 21, 45, .85);
+      --line: rgba(99, 128, 200, .20);
+      --line2: rgba(99, 128, 200, .34);
+      --txt: #e9eefc;
+      --dim: #93a3c8;
+      --accent: #3b82f6;
       --cyan: #22d3ee;
-      --red: #fb5161;
-      --amber: #f5a623;
-      --green: #34d399;
+      --red: #f43f5e;
+      --amber: #f59e0b;
+      --green: #10b981;
+      --violet: #8b5cf6;
+      --pink: #ec4899;
+      --brand: linear-gradient(135deg, #3b82f6 0%, #22d3ee 55%, #34d399 100%);
+      --shadow: 0 18px 38px -22px rgba(0, 0, 0, .95), inset 0 1px 0 rgba(255, 255, 255, .05);
+      --glass: rgba(11, 20, 44, .82);
+      /* soft terrain silhouette used as the decorative bleed on gradient cards */
+      --terrain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 70'%3E%3Cpath d='M0 70 L26 30 L42 47 L64 14 L86 44 L104 28 L120 51 L120 70Z' fill='%23ffffff' opacity='.30'/%3E%3Cpath d='M0 70 L18 48 L38 60 L58 40 L78 58 L98 46 L120 64 L120 70Z' fill='%23ffffff' opacity='.22'/%3E%3C/svg%3E");
     }
 
     * {
       box-sizing: border-box;
     }
 
-    html,
-    body {
-      margin: 0;
-      height: 100%;
-      overflow: hidden;
-      background: var(--bg);
-      font: 13px/1.45 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
-      color: var(--txt);
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    font: 13px / 1.45 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--txt);
+        background: repeating-radial-gradient(black, transparent 100px);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+    button,
+    select,
+    input {
+      font: inherit;
+      color: inherit;
     }
 
-    /* ============================== dashboard grid (layout per design) */
+    /* ============================== dashboard grid */
     #dash {
       display: grid;
       height: 100vh;
-      grid-template-columns: 230px minmax(0, 1fr) 312px;
-      grid-template-rows: 62px auto minmax(0, 1fr) 92px;
+      grid-template-columns: 274px minmax(0, 1fr);
+      grid-template-rows: 70px minmax(0, 1fr);
     }
 
     /* ============================== sidebar */
     #side {
-      grid-row: 1 / 5;
-      background: var(--side);
+      grid-row: 2;
+      grid-column: 1;
+          background: linear-gradient(0deg, rgb(1 8 14 / 60%) 0%, rgb(102 0 0) 100%);
       border-right: 1px solid var(--line);
+      box-shadow: 18px 0 40px -34px #000;
       display: flex;
       flex-direction: column;
-      padding: 14px 12px;
+      padding: 12px 11px;
+      overflow-y: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      position: relative;
+      z-index: 2;
     }
 
+    #side::-webkit-scrollbar {
+      display: none;
+    }
+
+    /* Chrome/Edge/Safari */
+
+    /* brand now lives in the topbar (left of the divider), sized to the sidebar column */
     #brand {
       display: flex;
-      gap: 10px;
+      gap: 11px;
       align-items: center;
-      padding: 2px 6px 16px;
-    }
-
-    #brand .crest {
-      width: 38px;
-      height: 38px;
-      border-radius: 10px;
       flex: none;
-      background: linear-gradient(145deg, #0b2d52, #114f8a);
-      border: 1px solid var(--line2);
-      display: grid;
-      place-items: center;
+      width: 263px;
+      padding-right: 12px;
+      border-right: 1px solid var(--line);
+      margin-right: 4px;
     }
 
-    #brand h1 {
-      font-size: 15px;
-      margin: 0;
-      line-height: 1.15;
-      letter-spacing: .4px;
-    }
+.crest {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex-shrink: 0;
+  min-width: 0;
+}
 
-    #brand h1 span {
-      display: block;
-      font-size: 9.5px;
-      color: var(--accent);
-      letter-spacing: 2.4px;
-      font-weight: 600;
-    }
+/* the source PNG is 900x560 with the circular emblem centred and blank margins
+   either side, so `cover` crops those margins away and the emblem fills the
+   tile — `contain` would letterbox it down to ~60% of the available size. */
+.crest img {
+    height: 65px;
+    width: auto;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+@keyframes logo-glow-pulse {
+
+  0%,
+  100% {
+    filter: drop-shadow(0 0 3px rgba(14, 213, 163, 0.25));
+  }
+
+  50% {
+    filter: drop-shadow(0 0 9px rgba(14, 213, 163, 0.6));
+  }
+}
+ 
+
+#brand h1 {
+    left: 32vw;
+    font-size: 36px;
+    position: absolute;
+    margin: 0;
+    line-height: 1.12;
+    letter-spacing: 2.3px;
+    font-weight: 800;
+    color: #fff;
+    font-family: auto;
+    text-shadow: -2px -1px 0 #000, 2px -1px 0 #000, -2px 1px 0 #000, 2px 1px 0 #000;
+}
+
+  
 
     nav {
       display: flex;
       flex-direction: column;
-      gap: 3px;
-      margin-top: 6px;
+      gap: 4px;
+      margin-top: 2px;
     }
 
-    nav a {
+    .navgroup {
       display: flex;
-      align-items: center;
-      gap: 11px;
-      padding: 9px 12px;
-      border-radius: 9px;
-      color: var(--dim);
-      text-decoration: none;
-      font-size: 13px;
-      font-weight: 520;
-      position: relative;
+      flex-direction: column;
+    }
+nav a, .navbtn {
+    display: flex;
+    align-items: center;
+    gap: 21px;
+    padding: 7px 10px;
+    border-radius: 23px;
+    color: #edf0f5;
+    text-decoration: none;
+    font-size: 16px;
+    font-weight: 600;
+    position: relative;
+    background: none;
+    border: 1px solid transparent;
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+}
+
+    /* each section keeps its own colour, carried on its icon tile */
+    nav [data-page="dashboard"] {
+      --ic: linear-gradient(135deg, #3b82f6, #6366f1);
+      --icg: rgba(59, 130, 246, .55);
     }
 
-    nav a svg {
-      width: 17px;
-      height: 17px;
-      stroke: currentColor;
+    nav [data-toggle="techew"] {
+      --ic: linear-gradient(135deg, #f43f5e, #e11d48);
+      --icg: rgba(244, 63, 94, .55);
+    }
+
+    nav [data-toggle="boundaries"] {
+      --ic: linear-gradient(135deg, #34d399, #059669);
+      --icg: rgba(16, 185, 129, .55);
+    }
+
+    nav [data-page="simex"] {
+      --ic: linear-gradient(135deg, #fb923c, #f59e0b);
+      --icg: rgba(245, 158, 11, .55);
+    }
+
+    nav [data-page="calendars"] {
+      --ic: linear-gradient(135deg, #60a5fa, #2563eb);
+      --icg: rgba(37, 99, 235, .55);
+    }
+
+    nav [data-page="general"] {
+      --ic: linear-gradient(135deg, #22d3ee, #0891b2);
+      --icg: rgba(34, 211, 238, .55);
+    }
+
+    nav a svg,
+    .navbtn svg:not(.chev) {
+      width: 30px;
+      height: 30px;
+      padding: 6px;
+      border-radius: 10px;
+      flex: none;
+      stroke: #fff;
       fill: none;
-      stroke-width: 1.7;
-      opacity: .9;
+      stroke-width: 1.8;
+      background: var(--ic, linear-gradient(135deg, #3b82f6, #6366f1));
+      box-shadow: 0 6px 14px -8px var(--icg, rgba(59, 130, 246, .55)), inset 0 1px 0 rgba(255, 255, 255, .28);
     }
 
-    nav a:hover {
-      background: rgba(56, 182, 255, 0.07);
-      color: var(--txt);
+    .navbtn .chev {
+      width: 16px;
+      height: 16px;
+      stroke: #7e8db0;
+      fill: none;
+      stroke-width: 2;
+      margin-left: auto;
+      transition: transform .15s;
+      flex: none;
     }
 
-    nav a.on {
-      background: linear-gradient(90deg, rgba(56, 182, 255, .20), rgba(56, 182, 255, .05));
-      color: #d9edff;
-      box-shadow: inset 2.5px 0 0 var(--accent);
+    nav a:hover,
+    .navbtn:hover {
+      background: rgba(99, 128, 200, .13);
+      color: #fff;
+      border-color: var(--line);
+    }
+
+    nav a.on,
+    .navbtn.on {
+      background: linear-gradient(135deg, #2563eb, #4f46e5 70%, #6366f1);
+      color: #fff;
+      border-color: rgba(147, 197, 253, .45);
+      box-shadow: 0 14px 28px -14px rgba(37, 99, 235, .95), inset 0 1px 0 rgba(255, 255, 255, .22);
+    }
+
+    nav a.on svg,
+    .navbtn.on svg:not(.chev) {
+      background: rgba(255, 255, 255, .22);
+      box-shadow: none;
+    }
+
+    .navbtn.on .chev {
+      stroke: #fff;
+    }
+
+    .navgroup.open .navbtn .chev {
+      transform: rotate(180deg);
     }
 
     nav .badge {
       margin-left: auto;
-      background: var(--red);
+      background: linear-gradient(135deg, #fb7185, #e11d48);
       color: #fff;
       font-size: 10px;
       font-weight: 700;
-      min-width: 17px;
-      height: 17px;
-      border-radius: 9px;
+      min-width: 19px;
+      height: 19px;
+      border-radius: 10px;
       display: grid;
       place-items: center;
-      padding: 0 4px;
+      padding: 0 5px;
+      box-shadow: 0 6px 14px -6px rgba(244, 63, 94, .9);
+    }
+
+    nav a.on .badge {
+      background: #fff;
+      color: #e11d48;
+    }
+
+.subnav {
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+    margin: 5px 2px 6px 8px;
+    padding-left: 0;
+}
+
+    .navgroup.open .subnav {
+      display: flex;
+    }
+
+   .subrow {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 0px 0px;
+    border-radius: 12px;
+    font-size: 16px;
+    color: #fff;
+    cursor: pointer;
+    border: 2px solid transparent;
+    width: 100%;
+    text-align: left;
+    background: var(--catgrad, linear-gradient(135deg, #34d399, #059669));
+    box-shadow: 0 10px 22px -14px #000, inset 0 1px 0 rgba(255, 255, 255, .24);
+}
+
+    .subrow:hover {
+      filter: brightness(1.1) saturate(1.05);
+    }
+
+    .subrow.active {
+      border-color: rgba(255, 255, 255, .9);
+      outline: 3px solid rgba(96, 165, 250, .55);
+      outline-offset: 1px;
+    }
+
+    .subrow .dotcat {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex: none;
+    }
+
+    .subrow .cicon {
+      width: 42px;
+      height: 42px;
+      flex: none;
+      display: grid;
+      place-items: center;
+      box-sizing: border-box;
+    }
+
+    .subrow .cicon svg {
+      width: 22px;
+      height: 22px;
+    }
+
+    .subrow .cicon img {
+      width: 42px;
+      height: 42px;
+      object-fit: contain;
+    }
+
+    .subrow .subname {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 650;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, .45);
+    }
+
+    .subrow .cnt {
+      margin-left: auto;
+      color: #fff;
+      background: rgba(0, 0, 0, .28);
+      border-radius: 10px;
+      padding: 0 7px;
+      font-variant-numeric: tabular-nums;
+      font-size: 12.5px;
+      font-weight: 700;
+      flex: none;
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 30px;
+      height: 17px;
+      flex: none;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .switch .sl {
+      position: absolute;
+      inset: 0;
+      background: rgba(148, 163, 184, .38);
+      border-radius: 20px;
+      cursor: pointer;
+      transition: .15s;
+    }
+
+    .switch .sl::before {
+      content: '';
+      position: absolute;
+      width: 13px;
+      height: 13px;
+      left: 2px;
+      top: 2px;
+      background: #fff;
+      border-radius: 50%;
+      transition: .15s;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, .5);
+    }
+
+    .switch input:checked+.sl {
+      background: var(--pc, var(--accent));
+      box-shadow: 0 0 12px -2px var(--pc, var(--accent));
+    }
+
+    .switch input:checked+.sl::before {
+      transform: translateX(13px);
+    }
+
+    .switch.small {
+      width: 26px;
+      height: 15px;
+    }
+
+    .switch.small .sl::before {
+      width: 11px;
+      height: 11px;
+    }
+
+    .switch.small input:checked+.sl::before {
+      transform: translateX(11px);
+    }
+
+    .subrow .swi {
+      margin-left: auto;
+    }
+
+    .subrow .switch .sl {
+      background: rgba(0, 0, 0, .3);
+    }
+
+    .subrow .switch input:checked+.sl {
+      background: #fff;
+      box-shadow: none;
+    }
+
+    .subrow .switch input:checked+.sl::before {
+      background: #059669;
     }
 
     #side .foot {
-      margin-top: auto;
-      padding: 12px 8px 2px;
-      border-top: 1px solid var(--line);
-      color: var(--dim);
+      margin: auto 2px 0;
+      border-radius: 14px;
+      overflow: hidden;
+      flex: none;
+      background: linear-gradient(180deg, rgba(30, 58, 138, .5), rgba(12, 21, 45, .9));
+      border: 1px solid var(--line);
+    }
+
+    #side .foot .art {
+      height: 62px;
+      background:
+        var(--terrain) bottom/115% auto no-repeat,
+        linear-gradient(160deg, #0ea5e9 0%, #6366f1 52%, #a855f7 100%);
+    }
+
+    #side .foot .cap {
+      padding: 10px 12px;
+      color: #a9b7d6;
       font-size: 11px;
       line-height: 1.5;
     }
 
     #side .foot b {
-      color: var(--accent);
+      color: #5eead4;
     }
 
     /* ============================== topbar */
     #topbar {
-      grid-column: 2 / 4;
+      grid-column: 1 / 3;
+      grid-row: 1;
       display: flex;
       align-items: center;
-      gap: 16px;
-      padding: 0 16px;
+      gap: 10px;
+      padding: 0 16px 0 11px;
+          background: linear-gradient(0deg, rgb(210 62 0 / 57%) 0%, rgb(0 0 0 / 95%) 100%);
+      backdrop-filter: blur(14px);
       border-bottom: 1px solid var(--line);
-      background: rgba(6, 15, 30, 0.6);
+      box-shadow: 0 16px 34px -30px #000;
+      min-width: 0;
+      position: relative;
+      z-index: 3;
+    }
+
+    #topbar::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -1px;
+      height: 2px;
+      background: linear-gradient(90deg, #3b82f6, #22d3ee 28%, #34d399 52%, #f59e0b 76%, #ec4899);
+      opacity: .75;
+    }
+
+    #topbar .t {
+      min-width: 0;
     }
 
     #topbar .t h2 {
       margin: 0;
-      font-size: 17px;
-      font-weight: 640;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #cbd6ef;
+      letter-spacing: .2px;
     }
 
     #topbar .t div {
       font-size: 11px;
       color: var(--dim);
-      margin-top: 1px;
+      margin-top: 2px;
+      font-weight: 500;
+    }
+
+    #topbar .t div b {
+      color: #67e8f9;
+      font-weight: 700;
     }
 
     #topbar .sp {
@@ -187,18 +522,60 @@
     .chip {
       display: flex;
       align-items: center;
-      gap: 8px;
-      font-size: 12px;
+      gap: 9px;
+      font-size: 11px;
       color: var(--dim);
       border: 1px solid var(--line);
-      background: var(--card);
-      border-radius: 9px;
-      padding: 7px 11px;
+      background: rgba(19, 29, 58, .7);
+      border-radius: 13px;
+      padding: 6px 12px 6px 7px;
+      white-space: nowrap;
+      box-shadow: var(--shadow);
+    }
+
+    .chip .cic {
+      width: 30px;
+      height: 30px;
+      border-radius: 10px;
+      flex: none;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, #3b82f6, #6366f1);
+      box-shadow: 0 6px 14px -8px rgba(59, 130, 246, .9);
+    }
+
+    .chip .cic svg {
+      width: 16px;
+      height: 16px;
+      stroke: #fff;
+      fill: none;
+      stroke-width: 2;
+    }
+
+    .chip .cln {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.25;
     }
 
     .chip b {
-      color: var(--txt);
-      font-weight: 620;
+      color: #fff;
+      font-weight: 750;
+      font-size: 13px;
+    }
+
+    .chip .csub {
+      color: var(--dim);
+      font-size: 10.5px;
+    }
+
+    #wxchip .cic {
+      background: linear-gradient(135deg, #fbbf24, #f97316);
+      box-shadow: 0 6px 14px -8px rgba(249, 115, 22, .9);
+    }
+
+    #wxchip #wx-desc {
+      color: var(--dim) !important;
     }
 
     .live-dot {
@@ -206,8 +583,9 @@
       height: 7px;
       border-radius: 50%;
       background: var(--green);
-      box-shadow: 0 0 8px var(--green);
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, .2);
       animation: pulse 1.6s infinite;
+      flex: none;
     }
 
     @keyframes pulse {
@@ -218,136 +596,154 @@
 
     #search {
       position: relative;
-      width: 250px;
+      width: 236px;
+      flex: none;
     }
 
     #search input {
       width: 100%;
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 9px;
+      background: rgba(9, 16, 38, .9);
+      border: 1px solid var(--line2);
+      border-radius: 12px;
       color: var(--txt);
-      font: inherit;
       font-size: 12.5px;
-      padding: 8px 12px 8px 32px;
+      padding: 9px 12px 9px 33px;
       outline: none;
     }
 
+    #search input::placeholder {
+      color: #7183a8;
+    }
+
     #search input:focus {
-      border-color: var(--line2);
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, .18);
     }
 
     #search svg {
       position: absolute;
-      left: 10px;
+      left: 11px;
       top: 50%;
       transform: translateY(-50%);
       width: 15px;
       height: 15px;
-      stroke: var(--dim);
+      stroke: #7dd3fc;
       fill: none;
-      stroke-width: 1.8;
+      stroke-width: 2;
+    }
+
+    #search .results {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      right: 0;
+      z-index: 40;
+    }
+
+    #search .results button:hover {
+      background: rgba(59, 130, 246, .2) !important;
     }
 
     .avatar {
-      width: 34px;
-      height: 34px;
+      width: 38px;
+      height: 38px;
       border-radius: 50%;
       flex: none;
-      background: linear-gradient(145deg, #11497e, #38b6ff);
-      border: 1px solid var(--line2);
+      background: linear-gradient(135deg, #a855f7, #6366f1);
+      border: 2px solid rgba(255, 255, 255, .28);
       display: grid;
       place-items: center;
-      font-weight: 700;
+      font-weight: 750;
       font-size: 13px;
       color: #fff;
+      cursor: pointer;
+      box-shadow: 0 10px 22px -10px rgba(168, 85, 247, .95);
     }
 
-    /* ============================== stat cards */
-    #stats {
+    /* ============================== main / view switch */
+    #main {
       grid-column: 2;
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 10px;
-      padding: 12px 14px 10px;
-    }
-
-    .stat {
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 11px 13px;
+      grid-row: 2;
+      min-height: 0;
       display: flex;
-      gap: 11px;
-      align-items: flex-start;
-      min-width: 0;
+      flex-direction: column;
+      overflow: hidden;
     }
 
-    .stat .ic {
-      width: 34px;
-      height: 34px;
-      flex: none;
-      border-radius: 9px;
+    #dashboard-view {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #page {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    .stat:nth-child(1) {
+      --sg: linear-gradient(135deg, #fb7185 0%, #e11d48 52%, #9f1239 100%);
+      --sgl: rgba(244, 63, 94, .95);
+    }
+
+    .stat:nth-child(2) {
+      --sg: linear-gradient(135deg, #2dd4bf 0%, #0d9488 52%, #065f46 100%);
+      --sgl: rgba(20, 184, 166, .95);
+    }
+
+    .stat:nth-child(3) {
+      --sg: linear-gradient(135deg, #fbbf24 0%, #f97316 52%, #c2410c 100%);
+      --sgl: rgba(249, 115, 22, .95);
+    }
+
+    .stat:nth-child(4) {
+      --sg: linear-gradient(135deg, #c084fc 0%, #7c3aed 52%, #5b21b6 100%);
+      --sgl: rgba(139, 92, 246, .95);
+    }
+
+    /* decorative terrain bleed on the right, echoing the simulation subject */
+    .stat::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      width: 118px;
+      height: 64px;
+      background: var(--terrain) right bottom/100% auto no-repeat;
+      opacity: .5;
+      pointer-events: none;
+      -webkit-mask-image: linear-gradient(90deg, transparent, #000 55%);
+      mask-image: linear-gradient(90deg, transparent, #000 55%);
+    }
+
+    /* ============================== dashboard body: map + right column */
+    #dashboard-body {
       display: grid;
-      place-items: center;
-      background: rgba(56, 182, 255, .12);
-      border: 1px solid rgba(56, 182, 255, .25);
+      grid-template-columns: minmax(0, 1fr) 318px;
+      gap: 12px;
+      padding: 2px 14px 10px;
+      flex: 1;
+      min-height: 0;
     }
 
-    .stat .ic svg {
-      width: 18px;
-      height: 18px;
-      stroke-width: 1.7;
-      fill: none;
-    }
-
-    .stat .v {
-      font-size: 21px;
-      font-weight: 700;
-      letter-spacing: .2px;
-      font-variant-numeric: tabular-nums;
-      line-height: 1.1;
-    }
-
-    .stat .v small {
-      font-size: 11px;
-      color: var(--dim);
-      font-weight: 520;
-    }
-
-    .stat .k {
-      font-size: 11px;
-      color: var(--dim);
-      margin-top: 2px;
-    }
-
-    .stat .d {
-      font-size: 10.5px;
-      margin-top: 3px;
-    }
-
-    .up {
-      color: var(--green);
-    }
-
-    .down {
-      color: var(--red);
-    }
-
-    .mid {
-      color: var(--amber);
-    }
-
-    /* ============================== map stage */
     #mapwrap {
-      grid-column: 2;
-      grid-row: 3;
       position: relative;
       overflow: hidden;
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      margin: 2px 14px 10px;
-      min-height: 360px;
+      border: 1px solid rgba(125, 211, 252, .22);
+      border-radius: 20px;
+      min-height: 320px;
+      box-shadow: 0 30px 60px -30px #000, 0 0 0 1px rgba(0, 0, 0, .5), 0 0 46px -20px rgba(56, 189, 248, .5);
     }
 
     #map {
@@ -360,130 +756,276 @@
       top: 0;
       left: 0;
       pointer-events: none;
+      z-index: 1;
+    }
+
+    /* hazard markers sit above the water overlay + time-of-day tint, so a site
+       on open water is never washed out by them; transition:none drops
+       MapLibre's own .2s marker fade so the icon is completely static */
+    .maplibregl-marker {
+      z-index: 3;
+      transition: none;
+    }
+
+    /* an open popup covers the water overlay, markers and their labels */
+    .maplibregl-popup {
+      z-index: 4;
     }
 
     .panel {
       position: absolute;
-      background: rgba(8, 14, 24, 0.86);
+      background: var(--glass);
       backdrop-filter: blur(14px);
       border: 1px solid var(--line2);
-      border-radius: 12px;
-      box-shadow: 0 10px 34px rgba(0, 0, 0, .5);
+      border-radius: 14px;
+      box-shadow: 0 20px 40px -20px #000, inset 0 1px 0 rgba(255, 255, 255, .08);
+      color: var(--txt);
     }
 
-    #ui {
-      top: 12px;
-      left: 12px;
-      width: 272px;
-      padding: 14px 14px 12px;
-      z-index: 5;
-      max-height: calc(100% - 24px);
-      overflow-y: auto;
-      scrollbar-width: thin;
-    }
-
-    #ui h1 {
-      margin: 0 0 2px;
-      font-size: 15px;
-      letter-spacing: .2px;
-      font-weight: 650;
-    }
-
-    #ui .sub {
-      color: var(--dim);
-      font-size: 11.5px;
-      margin-bottom: 12px;
-    }
-
-    .grp {
-      margin-bottom: 11px;
-    }
-
-    .lbl {
-      font-size: 10.5px;
-      text-transform: uppercase;
-      letter-spacing: .09em;
-      color: var(--dim);
-      margin-bottom: 5px;
-    }
-
-    .row {
+    #maptoolbar {
+      top: 14px;
+      left: 14px;
+      z-index: 6;
       display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
+      align-items: center;
+      padding: 4px;
+      gap: 3px;
     }
 
-    button,
-    .seg {
-      font: inherit;
+    .tabbtn {
+      background: none;
+      border: none;
+      color: #b8c6e4;
       font-size: 12px;
-      color: var(--txt);
-      background: rgba(255, 255, 255, .06);
-      border: 1px solid var(--line2);
-      border-radius: 8px;
-      padding: 5px 9px;
+      font-weight: 650;
+      padding: 7px 13px;
+      border-radius: 11px;
       cursor: pointer;
-      transition: .12s;
+      white-space: nowrap;
+      flex: none;
+      display: flex;
+      align-items: center;
+      gap: 7px;
     }
 
-    button:hover {
-      background: rgba(255, 255, 255, .13);
+    .tabbtn svg {
+      width: 14px;
+      height: 14px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
     }
 
-    button.on {
-      background: rgba(76, 195, 255, .22);
-      border-color: rgba(76, 195, 255, .55);
-      color: #dff2ff;
+    .tabbtn:hover {
+      background: rgba(99, 128, 200, .18);
+      color: #fff;
     }
 
-    input[type=range] {
-      width: 100%;
-      accent-color: var(--accent);
+    .tabbtn.on {
+      background: linear-gradient(135deg, #2563eb, #4f46e5);
+      color: #fff;
+      box-shadow: 0 10px 20px -10px rgba(37, 99, 235, .95);
     }
 
-    .val {
-      float: right;
-      color: var(--accent);
-      font-variant-numeric: tabular-nums;
+    #maptoolbar .divider {
+      width: 1px;
+      height: 20px;
+      background: var(--line2);
+      margin: 0 4px;
+      flex: none;
     }
 
-    #hud {
-      bottom: 12px;
-      left: 12px;
-      padding: 9px 12px;
-      font-size: 11.5px;
-      color: var(--dim);
-      font-variant-numeric: tabular-nums;
-      z-index: 5;
-      line-height: 1.6;
+    #maptoolbar .bmwrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 8px 0 10px;
+      border-radius: 11px;
+      color: #b8c6e4;
     }
 
-    #hud b {
+    #maptoolbar .bmwrap:hover {
+      background: rgba(99, 128, 200, .18);
+      color: #fff;
+    }
+
+    #maptoolbar .bmwrap svg {
+      width: 14px;
+      height: 14px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      flex: none;
+    }
+
+    #basemapSelect {
+      background: none;
+      border: none;
+      color: inherit;
+      font-size: 12px;
+      font-weight: 650;
+      padding: 7px 4px 7px 0;
+      cursor: pointer;
+      outline: none;
+      flex: none;
+      max-width: 104px;
+    }
+
+    #basemapSelect option {
+      background: #0f1b3d;
       color: var(--txt);
-      font-weight: 600;
     }
 
-    #legend {
-      bottom: 12px;
-      right: 12px;
-      padding: 10px 12px;
+    /* compass rose under the toolbar (rotates with bearing, click resets) */
+    #compass {
+      position: absolute;
+      top: 62px;
+      left: 14px;
+      z-index: 6;
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 50% 38%, rgba(56, 189, 248, .22), rgba(9, 16, 38, .9) 70%);
+      border: 1px solid var(--line2);
+      box-shadow: 0 16px 30px -16px #000;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      padding: 0;
+    }
+
+    #compass:hover {
+      border-color: #38bdf8;
+    }
+
+    #compass svg {
+      width: 40px;
+      height: 40px;
+      transform-origin: 50% 50%;
+    }
+
+    #mapctrl {
+      top: 14px;
+      right: 14px;
+      z-index: 6;
+      display: flex;
+      flex-direction: column;
+      padding: 5px;
+      gap: 3px;
+    }
+
+    #mapctrl button {
+      position: relative;
+      width: 33px;
+      height: 33px;
+      background: none;
+      border: none;
+      color: #b8c6e4;
+      border-radius: 10px;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+    }
+
+    #mapctrl button:hover {
+      background: rgba(99, 128, 200, .2);
+      color: #fff;
+    }
+
+    #mapctrl button.on {
+      background: linear-gradient(135deg, #2563eb, #4f46e5);
+      color: #fff;
+    }
+
+    #mapctrl button svg {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+    }
+
+    #mapctrl .badge2 {
+      position: absolute;
+      bottom: 1px;
+      right: 1px;
+      font-size: 8px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #fbbf24, #f97316);
+      color: #fff;
+      border-radius: 6px;
+      padding: 0 3px;
+      line-height: 1.35;
+    }
+
+    #coordhud {
+      bottom: 38px;
+      left: 14px;
+      padding: 9px 13px;
+      font-size: 11px;
+      color: #a8b6d8;
+      font-variant-numeric: tabular-nums;
       z-index: 5;
-      font-size: 11.5px;
     }
 
-    .ramp {
-      width: 150px;
-      height: 9px;
-      border-radius: 5px;
-      margin: 5px 0 3px;
-      background: linear-gradient(90deg, #eaf6ff, #2b6698, #082d52);
+    #coordhud b {
+      color: #fff;
+      font-weight: 700;
+    }
+
+    #coordhud .qtag {
+      margin-left: 6px;
+      padding: 1px 7px;
+      border-radius: 7px;
+      background: linear-gradient(135deg, #22d3ee, #3b82f6);
+      color: #06121f;
+      font-weight: 800;
+      font-size: 10px;
+    }
+
+    #sevlegend {
+      bottom: 32px;
+      right: 14px;
+      padding: 11px 13px;
+      z-index: 5;
+      font-size: 11px;
+    }
+
+    #sevlegend>div:first-child {
+      color: #fff;
+    }
+
+    .ramp2 {
+      width: 156px;
+      height: 10px;
+      border-radius: 6px;
+      margin: 7px 0 4px;
+      background: linear-gradient(90deg, #22c55e, #facc15, #fb923c, #ef4444);
+      box-shadow: 0 0 16px -4px rgba(251, 146, 60, .8);
     }
 
     .rampx {
       display: flex;
       justify-content: space-between;
-      color: var(--dim);
-      font-size: 10px;
+      font-size: 9.5px;
+      font-weight: 700;
+      gap: 4px;
+    }
+
+    .rampx span:nth-child(1) {
+      color: #4ade80;
+    }
+
+    .rampx span:nth-child(2) {
+      color: #facc15;
+    }
+
+    .rampx span:nth-child(3) {
+      color: #fb923c;
+    }
+
+    .rampx span:nth-child(4) {
+      color: #f87171;
     }
 
     .marker {
@@ -501,30 +1043,263 @@
       text-shadow: 0 1px 2px rgba(255, 255, 255, .95), 0 0 7px rgba(255, 255, 255, .8);
     }
 
+    /* ============================== hazard markers (no background chip — bare icon + label) */
+    /* icon + label CSS matched to the original app (legacy/maplayers.js:
+       .hazard-marker-icon / .marker-label-text) */
+    /* This class sits on the MapLibre marker ROOT, which vendor CSS positions
+       with `.maplibregl-marker { position:absolute; left:0; top:0 }` and then
+       offsets by a transform. A `position: relative` here (same specificity,
+       later in the cascade) silently won, dropping every icon into normal flow
+       so it rendered hundreds of px from its coordinate — while the separate
+       rain/ripple FX overlay, which keeps position:absolute, stayed correct.
+       Absolute is also the containing block .haz-label needs. */
+    .haz-marker-wrap {
+      position: absolute;
+      cursor: pointer;
+      pointer-events: auto;
+    }
+
+    .haz-marker-wrap img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: contain;
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4));
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: crisp-edges;
+      user-select: none;
+      -webkit-user-drag: none;
+      pointer-events: none;
+    }
+
+    .haz-marker-wrap .haz-label {
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      margin-bottom: 8px;
+      color: white;
+      padding: 6px 12px;
+      font-size: 14px;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      white-space: nowrap;
+      font-weight: 600;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9), -1px -1px 3px rgba(0, 0, 0, 0.9);
+      background: rgba(0, 0, 0, 0.7);
+      border-radius: 6px;
+      backdrop-filter: blur(4px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      display: inline-block;
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    /* ============================== rich hazard popup */
+    .maplibregl-popup-content {
+      padding: 0 !important;
+      background: transparent !important;
+      box-shadow: none !important;
+    }
+
+    .maplibregl-popup-tip {
+      display: none !important;
+    }
+
+    .maplibregl-popup-close-button {
+      width: 26px;
+      height: 26px;
+      font-size: 17px;
+      line-height: 24px;
+      color: #fff;
+      background: rgba(255, 255, 255, .22);
+      border-radius: 50%;
+      right: 10px;
+      top: 12px;
+    }
+
+    .maplibregl-popup-close-button:hover {
+      background: rgba(255, 255, 255, .38);
+    }
+
+    .hazpopup {
+      width: 250px;
+      background: #0f1b3d;
+      border: 1px solid var(--line2);
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 30px 60px -18px #000, 0 0 40px -18px rgba(56, 189, 248, .7);
+      font: 12.5px/1.4 ui-sans-serif, system-ui;
+      color: var(--txt);
+    }
+
+    .hazpopup-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 40px 14px 14px;
+      background: var(--brand);
+      color: #fff;
+    }
+
+    .hazpopup-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 11px;
+      overflow: hidden;
+      flex: none;
+      background: rgba(255, 255, 255, .95);
+      display: grid;
+      place-items: center;
+      box-shadow: 0 6px 14px -6px rgba(0, 0, 0, .7);
+    }
+
+    .hazpopup-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .hazpopup-title {
+      font-size: 14px;
+      font-weight: 750;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, .35);
+    }
+
+    .hazpopup-sub {
+      font-size: 10.5px;
+      color: rgba(255, 255, 255, .9);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-top: 1px;
+      font-weight: 600;
+    }
+
+    .hazpopup-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      padding: 12px 14px 0;
+    }
+
+    .hazpopup-stat {
+      background: rgba(99, 128, 200, .12);
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 7px 9px;
+      min-width: 0;
+    }
+
+    .hazpopup-stat:first-child {
+      background: rgba(59, 130, 246, .2);
+      border-color: rgba(96, 165, 250, .4);
+    }
+
+    .hazpopup-lbl {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: var(--dim);
+      margin-bottom: 2px;
+      font-weight: 700;
+    }
+
+    .hazpopup-val {
+      font-size: 12px;
+      font-weight: 750;
+      color: #fff;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .hazpopup-feedhead {
+      display: flex;
+      align-items: center;
+      padding: 12px 14px 6px;
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: #a8b6d8;
+      font-weight: 700;
+    }
+
+    .hazpopup-live {
+      margin-left: auto;
+      color: #fff;
+      background: linear-gradient(135deg, #fb7185, #e11d48);
+      border-radius: 10px;
+      padding: 1px 8px;
+      font-weight: 800;
+      letter-spacing: .04em;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .hazpopup-live::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #fff;
+      animation: pulse 1.6s infinite;
+    }
+
+    .hazpopup-feed {
+      margin: 0 14px 14px;
+      aspect-ratio: 16/10;
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+    }
+
+    .hazpopup-feed img {
+      width: 46%;
+      opacity: 1;
+      filter: drop-shadow(0 8px 16px rgba(0, 0, 0, .6));
+    }
+
+    .hazpopup-feedcap {
+      position: absolute;
+      bottom: 6px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 9.5px;
+      color: #dbe6ff;
+      font-weight: 600;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, .8);
+    }
+
     #boot {
       position: absolute;
       inset: 0;
       display: grid;
       place-items: center;
       z-index: 20;
-      background: #060f1e;
-      color: var(--dim);
       transition: opacity .5s;
+      background: radial-gradient(700px 340px at 50% 40%, rgba(56, 189, 248, .22), transparent 70%), linear-gradient(135deg, #0b1430, #0a1a35);
+      color: #7dd3fc;
+      font-weight: 650;
     }
 
     #tourcard {
       position: absolute;
-      bottom: 12px;
+      bottom: 14px;
       left: 50%;
       transform: translateX(-50%);
-      width: min(620px, calc(100% - 24px));
+      width: min(620px, calc(100% - 28px));
       padding: 14px 16px 12px;
       z-index: 8;
-      background: rgba(8, 14, 24, 0.9);
+      background: var(--glass);
       backdrop-filter: blur(14px);
       border: 1px solid var(--line2);
-      border-radius: 12px;
-      box-shadow: 0 10px 34px rgba(0, 0, 0, .5);
+      border-radius: 16px;
+      box-shadow: 0 24px 50px -20px #000;
+      color: var(--txt);
     }
 
     #tourcard .tk {
@@ -534,18 +1309,20 @@
       font-size: 10.5px;
       text-transform: uppercase;
       letter-spacing: .1em;
-      color: var(--accent);
+      color: #67e8f9;
+      font-weight: 800;
       margin-bottom: 4px;
     }
 
     #tourcard .tt {
       font-size: 15px;
-      font-weight: 650;
+      font-weight: 750;
       margin-bottom: 4px;
+      color: #fff;
     }
 
     #tourcard .tb {
-      color: var(--dim);
+      color: #b4c2e0;
       font-size: 12.5px;
       line-height: 1.5;
     }
@@ -571,17 +1348,36 @@
       width: 6px;
       height: 6px;
       border-radius: 50%;
-      background: rgba(255, 255, 255, .18);
+      background: rgba(148, 163, 184, .45);
       margin-left: 4px;
       vertical-align: middle;
     }
 
     #tourcard #tk-dots i.on {
-      background: var(--accent);
+      background: #22d3ee;
+      box-shadow: 0 0 8px #22d3ee;
+    }
+
+    #tourcard button {
+      font: inherit;
+      font-size: 12px;
+      font-weight: 650;
+      color: #93c5fd;
+      background: rgba(59, 130, 246, .18);
+      border: 1px solid rgba(96, 165, 250, .38);
+      border-radius: 10px;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+
+    #tourcard #tk-end {
+      color: #fda4af;
+      background: rgba(244, 63, 94, .16);
+      border-color: rgba(244, 63, 94, .4);
     }
 
     .maplibregl-ctrl-group {
-      background: rgba(8, 14, 24, .86) !important;
+      background: var(--glass) !important;
       border: 1px solid var(--line2);
     }
 
@@ -589,257 +1385,891 @@
       border-top: 1px solid var(--line);
     }
 
-    .maplibregl-ctrl-icon {
+    /* attribution stays visible (it is required) but themed to the dark map card */
+    .maplibregl-ctrl-attrib {
+      background: rgba(11, 20, 44, .82) !important;
+      color: #b4c2e0 !important;
+      border-radius: 8px 0 0 0;
+    }
+
+    .maplibregl-ctrl-attrib a {
+      color: #93c5fd !important;
+    }
+
+    .maplibregl-ctrl-attrib-button {
       filter: invert(1) hue-rotate(180deg) brightness(1.4);
+    }
+
+    .maplibregl-ctrl-scale {
+      background: rgba(11, 20, 44, .8) !important;
+      border-color: rgba(147, 197, 253, .55) !important;
+      color: #dbe6ff !important;
+      font-weight: 650;
     }
 
     /* ============================== right column */
     #right {
-      grid-column: 3;
-      grid-row: 2 / 4;
       overflow-y: auto;
-      scrollbar-width: thin;
-      padding: 12px 14px 10px 0;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
       display: flex;
       flex-direction: column;
+      gap: 11px;
+      padding-right: 2px;
+    }
+
+    #right::-webkit-scrollbar {
+      display: none;
+    }
+
+  .rpanel {
+    --pc: #3b82f6;
+    --pct: rgb(16 2 18);
+    --pcb: rgb(2 7 14 / 40%);
+    --pcg: linear-gradient(135deg, #2563eb, #4f46e5);
+    background: linear-gradient(0deg, rgb(6 1 1) 0%, rgb(157 12 12 / 48%) 100%);
+    border: 1px solid rgb(255 255 255);
+    border-radius: 16px;
+    flex: none;
+    padding: 12px 13px;
+    box-shadow: var(--shadow);
+    position: relative;
+    overflow: hidden;
+}
+
+    .rpanel::before {
+      content: '';
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 3px;
+      background: var(--pcg);
+      opacity: .9;
+    }
+
+    .rpanel:nth-child(2) {
+      --pc: #a855f7;
+      --pct: rgba(168, 85, 247, .16);
+      --pcb: rgba(192, 132, 252, .42);
+      --pcg: linear-gradient(135deg, #a855f7, #7c3aed);
+    }
+
+    .rpanel:nth-child(3) {
+      --pc: #22d3ee;
+      --pct: rgba(34, 211, 238, .14);
+      --pcb: rgba(103, 232, 249, .4);
+      --pcg: linear-gradient(135deg, #22d3ee, #14b8a6);
+    }
+
+    .rpanel h3 {
+      margin: 0 0 10px;
+      font-size: 13px;
+      font-weight: 750;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .rpanel h3::before {
+      content: '';
+      width: 9px;
+      height: 9px;
+      border-radius: 3px;
+      background: var(--pcg);
+      box-shadow: 0 0 10px -1px var(--pc);
+      flex: none;
+    }
+
+    .rpanel h3 .switch {
+      margin-left: auto;
+    }
+
+    .rpanel h3 .sub3 {
+      font-weight: 500;
+      color: var(--dim);
+      font-size: 10.5px;
+    }
+
+    /* hero strip at the top of the simulation-controls panel */
+    .rhero {
+      display: flex;
       gap: 10px;
+      align-items: center;
+      margin: 0 0 10px;
     }
 
-    .rpanel {
-      background: var(--card);
-      border: 1px solid var(--line);
+    .rhero .rart {
+      width: 74px;
+      height: 50px;
       border-radius: 12px;
-      padding: 11px 13px;
+      flex: none;
+      border: 1px solid rgba(255, 255, 255, .18);
+      background: var(--terrain) bottom/125% auto no-repeat, linear-gradient(160deg, #22d3ee, #3b82f6 55%, #6366f1);
+      box-shadow: 0 10px 22px -12px rgba(56, 189, 248, .9);
     }
 
-    #hazsel {
-      width: 100%;
-      background: rgba(255, 255, 255, .06);
-      color: var(--txt);
-      border: 1px solid var(--line2);
-      border-radius: 8px;
+    .rhero .rbtns {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .rhero button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
       font: inherit;
       font-size: 12px;
-      padding: 6px 8px;
+      font-weight: 700;
+      border-radius: 10px;
+      padding: 8px 10px;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+
+    .rhero button svg {
+      width: 14px;
+      height: 14px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+    }
+
+    .rhero .hero1 {
+      background: linear-gradient(135deg, #2563eb, #4f46e5);
+      color: #fff;
+      box-shadow: 0 12px 24px -12px rgba(37, 99, 235, .95);
+    }
+
+    .rhero .hero2 {
+      background: rgba(99, 128, 200, .16);
+      border-color: var(--line2);
+      color: #cbd6ef;
+    }
+
+    .rhero .hero1:hover {
+      filter: brightness(1.08);
+    }
+
+    .rhero .hero2:hover {
+      background: rgba(99, 128, 200, .3);
+      color: #fff;
+    }
+
+    .qa4,
+    .qa6 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px;
+    }
+
+    .qa4 button,
+    .qa6 button,
+    .row2 button {
+      font: inherit;
+      font-size: 11.5px;
+      font-weight: 650;
+      color: #cbd6ef;
+      background: rgba(99, 128, 200, .13);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px 6px;
+      cursor: pointer;
+      text-align: center;
+      transition: .12s;
+    }
+
+    .qa4 button:hover,
+    .qa6 button:hover,
+    .row2 button:hover {
+      background: var(--pcg);
+      border-color: transparent;
+      color: #fff;
+    }
+
+    .qa4 button.on,
+    .qa6 button.on,
+    .row2 button.on {
+      background: var(--pcg);
+      border-color: transparent;
+      color: #fff;
+      box-shadow: 0 10px 20px -12px var(--pc);
+    }
+
+    .hdrow {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11.5px;
+      color: var(--dim);
+      margin: -2px 0 9px;
+    }
+
+    .hdrow b {
+      color: var(--pc);
+    }
+
+    .subhead {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: #7e8db0;
+      font-weight: 800;
+      margin: 12px 0 6px;
+    }
+
+    .grp {
+      margin: 11px 0 0;
+    }
+
+    .lbl {
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: .09em;
+      color: #93a3c8;
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .val {
+      color: var(--pc, var(--accent));
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* background:transparent — Chrome gives range inputs a white default
+       background, which reads as a white bar on the dark panels */
+    input[type=range] {
+      width: 100%;
+      accent-color: var(--pc, var(--accent));
+      background: transparent;
+    }
+
+    .ddrow {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
       margin-bottom: 7px;
+    }
+
+    .ddrow label {
+      font-size: 11.5px;
+      color: #b4c2e0;
+      font-weight: 600;
+      flex: none;
+    }
+
+    .ddrow select {
+      flex: 1;
+      min-width: 0;
+      background: rgba(9, 16, 38, .85);
+      border: 1px solid var(--line2);
+      color: var(--txt);
+      border-radius: 9px;
+      padding: 6px 8px;
+      font-size: 12px;
       outline: none;
     }
 
-    #hazsel option {
-      background: #0a1728;
+    .ddrow select:focus {
+      border-color: var(--pc);
+      box-shadow: 0 0 0 3px var(--pct);
     }
 
-    .hazrow {
+    .ddrow select option {
+      background: #0f1b3d;
+      color: var(--txt);
+    }
+
+    .chkrow {
       display: flex;
-      gap: 6px;
-      margin-bottom: 6px;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #cbd6ef;
+      font-weight: 550;
+      padding: 5px 0;
+      cursor: pointer;
     }
 
-    .hazrow button {
+    .chkrow input {
+      accent-color: var(--pc, var(--accent));
+      width: 14px;
+      height: 14px;
+    }
+
+    .row2 {
+      display: flex;
+      gap: 7px;
+      margin-top: 9px;
+    }
+
+    .row2 button {
       flex: 1;
+    }
+
+    #btnSpread {
+      background: linear-gradient(135deg, #2563eb, #4f46e5);
+      border-color: transparent;
+      color: #fff;
+    }
+
+    #btnFlow {
+      background: linear-gradient(135deg, #14b8a6, #059669);
+      border-color: transparent;
+      color: #fff;
+    }
+
+    #btnSpread:hover,
+    #btnFlow:hover {
+      filter: brightness(1.1);
     }
 
     .note {
       color: var(--dim);
       font-size: 10.5px;
       line-height: 1.45;
+      margin-bottom: 8px;
     }
 
-    .maplibregl-popup-content {
-      background: rgba(10, 19, 34, .94) !important;
-      color: var(--txt) !important;
-      border: 1px solid var(--line2);
-      border-radius: 10px;
-      box-shadow: 0 8px 26px rgba(0, 0, 0, .55);
-      padding: 11px 13px !important;
-      backdrop-filter: blur(10px);
-    }
 
-    .maplibregl-popup-tip {
-      border-top-color: rgba(10, 19, 34, .94) !important;
-      border-bottom-color: rgba(10, 19, 34, .94) !important;
-    }
-
-    .bdyrow {
-      display: flex;
-      gap: 6px;
-      margin: 8px 0 6px;
-    }
-
-    .bdyrow button {
-      flex: 1;
-      font-size: 11.5px;
-    }
-
-    .rpanel h3 {
-      margin: 0 0 8px;
-      font-size: 12.5px;
-      font-weight: 640;
+    /* ============================== pages */
+    .page-header {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      gap: 12px;
     }
 
-    .rpanel h3 .more {
-      color: var(--accent);
-      font-size: 10.5px;
-      font-weight: 520;
-    }
-
-    .krow {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 12px;
-      color: var(--dim);
-      padding: 5.5px 0;
-      border-bottom: 1px dashed rgba(96, 150, 220, .10);
-    }
-
-    .krow:last-child {
-      border-bottom: 0;
-    }
-
-    .krow b {
-      color: var(--txt);
-      font-weight: 600;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .qa {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 7px;
-    }
-
-    .qa button {
-      padding: 8px 6px;
-      text-align: center;
-      font-size: 11.5px;
-    }
-
-    .qa button.wide {
-      grid-column: 1 / 3;
-    }
-
-    .ds {
-      font-size: 11.5px;
-      color: var(--dim);
-      padding: 6px 0;
-      border-bottom: 1px dashed rgba(96, 150, 220, .10);
-    }
-
-    .ds:last-child {
-      border-bottom: 0;
-    }
-
-    .ds b {
-      color: var(--txt);
-      display: block;
-      font-size: 12px;
-    }
-
-    .ds .bar {
-      height: 4px;
-      border-radius: 2px;
-      background: rgba(255, 255, 255, .08);
-      margin-top: 5px;
-      overflow: hidden;
-    }
-
-    .ds .bar i {
-      display: block;
-      height: 100%;
-      border-radius: 2px;
-      background: linear-gradient(90deg, #22d3ee, #38b6ff);
-    }
-
-    .hot {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-
-    .hot button {
-      color: var(--dim);
-    }
-
-    .hot button:hover {
-      color: var(--txt);
-      border-color: rgba(251, 81, 97, .5);
-    }
-
-    .hot .dotx {
-      display: inline-block;
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--red);
-      margin-right: 5px;
-      vertical-align: 1px;
-    }
-
-    /* ============================== alerts strip */
-    #alerts {
-      grid-column: 2 / 4;
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      padding: 0 14px 12px;
-      margin-top: -4px;
-    }
-
-    .acard {
-      flex: 1;
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 11px;
-      padding: 9px 12px;
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      min-width: 0;
-    }
-
-    .acard .a-ic {
-      width: 30px;
-      height: 30px;
-      flex: none;
-      border-radius: 8px;
+    .page-header .pic {
+      width: 46px;
+      height: 46px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #2563eb, #4f46e5);
       display: grid;
       place-items: center;
-      background: rgba(251, 81, 97, .13);
+      flex: none;
+      box-shadow: 0 16px 28px -14px rgba(37, 99, 235, .95);
     }
 
-    .acard .a-ic.warn {
-      background: rgba(245, 166, 35, .13);
-    }
-
-    .acard .a-ic svg {
-      width: 16px;
-      height: 16px;
-      stroke-width: 1.8;
+    .page-header .pic svg {
+      width: 22px;
+      height: 22px;
+      stroke: #fff;
       fill: none;
+      stroke-width: 1.9;
     }
 
-    .acard b {
-      font-size: 12px;
-      display: block;
+    .page-header h2 {
+      margin: 0;
+      font-size: 19px;
+      color: #fff;
+      font-weight: 750;
     }
 
-    .acard span {
+    .page-header .psub {
       color: var(--dim);
+      font-size: 12px;
+      margin-top: 2px;
+    }
+
+    .bdylist {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .bdyrow2 {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-left: 3px solid #10b981;
+      border-radius: 14px;
+      padding: 12px 14px;
+      box-shadow: var(--shadow);
+    }
+
+    .bdyrow2 .bname {
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .bdyrow2 .bsub {
       font-size: 11px;
-      display: block;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
+      color: var(--dim);
+      margin-top: 2px;
+    }
+
+    .bdyrow2 .bright {
+      margin-left: auto;
+    }
+
+    #pageBody {
+      background: var(--side, #0b1430);
+      border: 1px solid var(--line, rgba(99, 128, 200, .20));
+      border-radius: 20px;
+      padding: 16px;
+      min-height: calc(100vh - 120px);
+      box-shadow: 0 25px 60px rgba(0, 0, 0, .8), inset 0 1px 0 rgba(255, 255, 255, .05);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
       overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .vheader {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 18px;
+      border-radius: 14px;
+      background: var(--vgrad, var(--brand));
+      color: #fff;
+      margin: -16px -16px 16px;
+      box-shadow: 0 24px 44px -26px #000, inset 0 1px 0 rgba(255, 255, 255, .24);
+    }
+
+
+    .vheader .vhic {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, .24);
+      display: grid;
+      place-items: center;
+      flex: none;
+    }
+
+    .vheader .vhic svg {
+      width: 20px;
+      height: 20px;
+      stroke: #fff;
+      fill: none;
+      stroke-width: 1.8;
+    }
+
+    .vheader h2 {
+      margin: 0;
+      font-size: 17px;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, .3);
+    }
+
+    .vheader .vhsub {
+      font-size: 11px;
+      color: rgba(255, 255, 255, .9);
+      margin-top: 2px;
+    }
+
+    .vheader .vhsp {
+      flex: 1;
+    }
+
+    .vheader button {
+      font-size: 12px;
+      cursor: pointer;
+      border-radius: 10px;
+      padding: 8px 13px;
+      font-weight: 650;
+    }
+
+    .vheader .vhadd {
+      background: #fff;
+      border: 1px solid #fff;
+      color: #1d4ed8;
+      font-weight: 750;
+      box-shadow: 0 10px 20px -10px rgba(0, 0, 0, .8);
+    }
+
+    .vheader .vhadd:hover {
+      background: #e0f2fe;
+    }
+
+    .vheader .vhclose {
+      background: rgba(255, 255, 255, .22);
+      border: 1px solid rgba(255, 255, 255, .4);
+      color: #fff;
+      width: 34px;
+      padding: 0;
+      font-size: 16px;
+    }
+
+    .vheader .vhclose:hover {
+      background: rgba(255, 255, 255, .34);
+    }
+
+    .vheader .vhlogout {
+      background: rgba(255, 255, 255, .18);
+      border: 1px solid rgba(255, 255, 255, .4);
+      color: #fff;
+    }
+
+    .vheader .vhlogout:hover {
+      background: rgba(255, 255, 255, .3);
+    }
+
+    .vgrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      gap: 14px;
+    }
+
+    .vcard {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    .vcard .vthumb {
+      aspect-ratio: 16/9;
+      background: linear-gradient(135deg, #1e3a8a, #0e7490 55%, #134e4a);
+      display: grid;
+      place-items: center;
+      color: var(--dim);
+      position: relative;
+      overflow: hidden;
+      cursor: pointer;
+    }
+
+    .vcard .vthumbimg,
+    .vcard .vthumb iframe {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      object-fit: cover;
+    }
+
+    .vcard .vpriv {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      z-index: 1;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: rgba(245, 158, 11, .22);
+      color: #fcd34d;
+      border: 1px solid rgba(251, 191, 36, .5);
+    }
+
+    .vcard .vplay {
+      position: relative;
+      z-index: 1;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--brand);
+      display: grid;
+      place-items: center;
+      box-shadow: 0 0 0 6px rgba(255, 255, 255, .14), 0 14px 28px -10px rgba(34, 211, 238, .9);
+    }
+
+    .vcard .vplay svg {
+      width: 18px;
+      height: 18px;
+      fill: #fff;
+      margin-left: 2px;
+    }
+
+    .vcard .vinfo {
+      padding: 11px 12px 12px;
+    }
+
+    .vcard .vinfo b {
+      font-size: 13px;
+      display: block;
+      color: #fff;
+    }
+
+    .vcard .vinfo span {
+      font-size: 11px;
+      color: var(--dim);
+      display: block;
+      margin-top: 2px;
+    }
+
+    .vcard .venlarge {
+      margin-top: 10px;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      background: rgba(59, 130, 246, .16);
+      border: 1px solid rgba(96, 165, 250, .38);
+      color: #93c5fd;
+      font-size: 11.5px;
+      font-weight: 700;
+      padding: 7px;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    .vcard .venlarge:hover {
+      background: linear-gradient(135deg, #2563eb, #4f46e5);
+      border-color: transparent;
+      color: #fff;
+    }
+
+    .vcard .venlarge svg {
+      width: 13px;
+      height: 13px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+    }
+
+    .vempty {
+      grid-column: 1/-1;
+      text-align: center;
+      padding: 34px 16px;
+      color: #b4c2e0;
+      background: rgba(19, 29, 58, .5);
+      border: 2px dashed rgba(96, 165, 250, .35);
+      border-radius: 16px;
+    }
+
+    .vempty button {
+      margin-top: 10px;
+    }
+
+    .vempty .vempty-hint {
+      display: inline-block;
+      margin-top: 6px;
+      font-size: 11.5px;
+      color: var(--dim);
+    }
+
+    .vempty code,
+    .vmodal-note code {
+      background: rgba(59, 130, 246, .2);
+      padding: 1px 6px;
+      border-radius: 5px;
+      font-size: 11px;
+      color: #93c5fd;
+    }
+
+    .vmodal {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: rgba(3, 7, 18, .68);
+      backdrop-filter: blur(6px);
+    }
+
+    .vmodal-box {
+      width: min(460px, 100%);
+      background: #0f1b3d;
+      border: 1px solid var(--line2);
+      border-top: 4px solid #3b82f6;
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 40px 80px -30px #000;
+      color: var(--txt);
+    }
+
+    .vmodal-box.wide {
+      width: min(900px, 100%);
+    }
+
+    .vmodal-box h3 {
+      margin: 0 0 6px;
+      font-size: 16px;
+      color: #fff;
+    }
+
+    .vmodal-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .vmodal-head h3 {
+      margin: 0;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .vmodal-x {
+      flex: none;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: rgba(99, 128, 200, .16);
+      border: 1px solid var(--line);
+      color: #b4c2e0;
+      cursor: pointer;
+    }
+
+    .vmodal-x:hover {
+      background: rgba(244, 63, 94, .22);
+      color: #fda4af;
+    }
+
+    .vmodal-note {
+      margin: 0 0 14px;
+      color: var(--dim);
+      font-size: 12px;
+    }
+
+    .vmodal-box form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .vmodal-box input:not([type=file]),
+    .vmodal-box textarea {
+      background: rgba(9, 16, 38, .85);
+      border: 1px solid var(--line2);
+      border-radius: 10px;
+      padding: 9px 11px;
+      color: var(--txt);
+      font: inherit;
+      font-size: 13px;
+      resize: vertical;
+      outline: none;
+    }
+
+    .vmodal-box input:not([type=file]):focus,
+    .vmodal-box textarea:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, .18);
+    }
+
+    .vmodal-box input[type=file] {
+      color: #b4c2e0;
+      font-size: 12px;
+    }
+
+    .vmodal-err {
+      color: #fda4af;
+      background: rgba(244, 63, 94, .14);
+      border: 1px solid rgba(244, 63, 94, .4);
+      border-radius: 9px;
+      padding: 6px 9px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .vmodal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .vmodal-cancel {
+      background: rgba(99, 128, 200, .16);
+      border: 1px solid var(--line);
+      color: #cbd6ef;
+      border-radius: 10px;
+      padding: 8px 14px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .vmodal-cancel:hover {
+      background: rgba(99, 128, 200, .3);
+      color: #fff;
+    }
+
+    .vmodal-box button.primary:disabled {
+      opacity: .5;
+      cursor: default;
+    }
+
+    .vprogress {
+      position: relative;
+      height: 24px;
+      border-radius: 9px;
+      background: rgba(9, 16, 38, .9);
+      overflow: hidden;
+      border: 1px solid var(--line);
+    }
+
+    .vprogress-bar {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 0;
+      background: var(--brand);
+    }
+
+    .vprogress-txt {
+      position: relative;
+      display: block;
+      text-align: center;
+      font-size: 11.5px;
+      line-height: 24px;
+      font-weight: 700;
+      color: #fff;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, .6);
+    }
+
+    .venframe {
+      position: relative;
+      aspect-ratio: 16/9;
+      background: #000;
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    .venframe iframe {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
+
+
+
+    button.primary {
+      background: linear-gradient(135deg, #2563eb, #4f46e5);
+      border: 1px solid transparent;
+      color: #fff;
+      font-weight: 700;
+      border-radius: 10px;
+      padding: 8px 14px;
+      font-size: 12px;
+      cursor: pointer;
+      box-shadow: 0 12px 24px -12px rgba(37, 99, 235, .95);
+    }
+
+    button.primary:hover {
+      filter: brightness(1.08);
     }
 
     @media (max-width: 1180px) {
-      #stats {
-        grid-template-columns: repeat(2, 1fr);
+      #dashboard-body {
+        grid-template-columns: 1fr;
+      }
+
+      #right {
+        flex-direction: row;
+        flex-wrap: wrap;
       }
     }
   </style>
@@ -850,309 +2280,337 @@
 
     <!-- ================= sidebar ================= -->
     <aside id="side">
-      <div id="brand">
-        <div class="crest">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7dd3fc" stroke-width="1.8">
-            <path d="M3 15q4.5-4.5 9 0t9 0" />
-            <path d="M3 19q4.5-4.5 9 0t9 0" opacity=".55" />
-            <path d="M12 3l2.4 4.8L12 10l-2.4-2.2z" opacity=".85" />
-          </svg>
-        </div>
-        <h1>3D SIMULATIONS<span>PORTAL · PAKISTAN</span></h1>
-      </div>
-      <nav>
-        <a class="on" href="#"><svg viewBox="0 0 24 24">
+      <nav id="mainnav">
+        <a class="on" data-page="dashboard" href="#"><svg viewBox="0 0 24 24">
             <path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z" />
           </svg>Dashboard</a>
-        <a href="#"><svg viewBox="0 0 24 24">
-            <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zm0 0v16m6-14v16" />
-          </svg>Map View</a>
-        <a href="#"><svg viewBox="0 0 24 24">
-            <path d="M12 3l9 5-9 5-9-5 9-5z" />
-            <path d="M3 13l9 5 9-5" opacity=".6" />
-            <path d="M3 17.5l9 5 9-5" opacity=".35" />
-          </svg>Comparison Map</a>
-        <a href="#"><svg viewBox="0 0 24 24">
-            <path d="M4 20V10m6 10V4m6 16v-7m4 7H2" />
-          </svg>Analytics &amp; Charts</a>
-        <a href="#"><svg viewBox="0 0 24 24">
-            <path d="M7 3h8l4 4v14H7z" />
-            <path d="M15 3v4h4M10 13h5m-5 4h5" opacity=".7" />
-          </svg>Reports</a>
-        <a href="#"><svg viewBox="0 0 24 24">
-            <path d="M18 16v-5a6 6 0 1 0-12 0v5l-2 3h16z" />
-            <path d="M10 21h4" />
-          </svg>Alerts<span class="badge">3</span></a>
-        <a href="#"><svg viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="3" />
-            <path
-              d="M19 12a7 7 0 0 0-.1-1.3l2-1.6-2-3.4-2.3 1a7 7 0 0 0-2.3-1.3L14 2h-4l-.3 2.4a7 7 0 0 0-2.3 1.3l-2.3-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .9.1 1.3l-2 1.6 2 3.4 2.3-1a7 7 0 0 0 2.3 1.3L10 22h4l.3-2.4a7 7 0 0 0 2.3-1.3l2.3 1 2-3.4-2-1.6c.1-.4.1-.9.1-1.3z" />
-          </svg>Settings</a>
+
+        <div class="navgroup" data-group="techew">
+          <button class="navbtn" data-toggle="techew" type="button"><svg viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="2.4" />
+              <path d="M12 9.6a2.4 2.4 0 1 1 0 4.8" opacity=".8" />
+              <path d="M7.5 16.5a7 7 0 0 1 0-9M16.5 7.5a7 7 0 0 1 0 9" opacity=".7" />
+              <path d="M4.2 19.8a11 11 0 0 1 0-15.6M19.8 4.2a11 11 0 0 1 0 15.6" opacity=".45" />
+            </svg>Tech-EW Hazards<svg class="chev" viewBox="0 0 24 24">
+              <path d="M6 9l6 6 6-6" />
+            </svg></button>
+          <div class="subnav" id="techew-sub"></div>
+        </div>
+
+        <div class="navgroup" data-group="boundaries">
+          <button class="navbtn" data-toggle="boundaries" type="button"><svg viewBox="0 0 24 24">
+              <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zm0 0v16m6-14v16" />
+            </svg>Boundaries<svg class="chev" viewBox="0 0 24 24">
+              <path d="M6 9l6 6 6-6" />
+            </svg></button>
+          <div class="subnav" id="boundaries-sub"></div>
+        </div>
+
+        <a data-page="simex" href="#"><svg viewBox="0 0 24 24">
+            <path d="M4 8l3-4h3l-3 4zm5 0 3-4h3l-3 4zm5 0 3-4h2v4z" opacity=".8" />
+            <path d="M3 8h18v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" />
+            <path d="M10 12l5 2.5-5 2.5z" fill="currentColor" stroke="none" />
+          </svg>Simex Videos</a>
+        <a data-page="calendars" href="#"><svg viewBox="0 0 24 24">
+            <rect x="3" y="5" width="18" height="16" rx="2" />
+            <path d="M3 10h18M8 3v4M16 3v4" opacity=".8" />
+            <path d="M7.5 14h2v2h-2zM11 14h2v2h-2zM14.5 14h2v2h-2z" fill="currentColor" stroke="none" opacity=".7" />
+          </svg>Hazard Calendars</a>
+        <a data-page="general" href="#"><svg viewBox="0 0 24 24">
+            <rect x="3" y="5" width="18" height="14" rx="2" />
+            <path d="M10 9.5l5 2.5-5 2.5z" fill="currentColor" stroke="none" />
+          </svg>General Videos</a>
+
       </nav>
-      <div class="foot">Live surface physics for <b>a safer tomorrow</b> — every polygon, every frame, computed on your
-        GPU.</div>
+
     </aside>
 
     <!-- ================= topbar ================= -->
     <header id="topbar">
-      <div class="t">
-        <h2>Pakistan Water Surface Portal</h2>
-        <div>Early Insights &nbsp;|&nbsp; Safer Communities &nbsp;|&nbsp; Resilient Pakistan</div>
+      
+        <div class="crest">
+          <!-- path is relative to this page, which already sits in portal/ -->
+          <img src="./icons/ndma.png" alt="NDMA — National Disaster Management Authority, Pakistan" />
+        </div>
+        <div id="brand">
+        <h1>3D SIMULATION PORTAL</h1>
       </div>
+    
       <div class="sp"></div>
+      <div class="chip" id="wxchip">
+        <span class="cic"><svg viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="4.5" />
+            <path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"
+              opacity=".8" />
+          </svg></span>
+        <span class="cln"><b id="wx-temp">–</b><span class="csub"><span id="wx-city">Islamabad</span> · <span
+              id="wx-desc">–</span></span></span>
+      </div>
+      <div class="chip">
+        <span class="cic"><svg viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="8.5" />
+            <path d="M12 7.2V12l3.2 2" />
+          </svg></span>
+        <span class="cln"><b id="clock">–</b><span class="csub"><span class="live-dot"
+              style="display:inline-block;margin-right:5px"></span><span id="date">–</span></span></span>
+      </div>
       <div id="search">
         <svg viewBox="0 0 24 24">
           <circle cx="11" cy="11" r="7" />
           <path d="M16.5 16.5L21 21" />
         </svg>
-        <input id="q" type="text" placeholder="Search hotspot — Tarbela, Sukkur, Panjnad…" />
+        <input id="q" type="text" placeholder="Search location, hazard or simulation…" autocomplete="off" />
       </div>
-      <div class="chip"><span class="live-dot"></span><span><b id="clock">–</b>&nbsp;<span id="date">–</span></span>
-      </div>
-      <div class="avatar">PK</div>
+      <button class="avatar" id="avatarBtn" title="Settings">PK</button>
     </header>
 
-    <!-- ================= stat cards ================= -->
-    <section id="stats">
-      <div class="stat">
-        <div class="ic"><svg viewBox="0 0 24 24" stroke="#38b6ff">
-            <path d="M12 3s6 6.4 6 10.5a6 6 0 1 1-12 0C6 9.4 12 3 12 3z" />
-          </svg></div>
-        <div>
-          <div class="v">3,688</div>
-          <div class="k">Water bodies simulated</div>
-          <div class="d up">▲ 345 river reaches · 3,343 flood sheets</div>
-        </div>
-      </div>
-      <div class="stat">
-        <div class="ic"><svg viewBox="0 0 24 24" stroke="#22d3ee">
-            <path d="M3 16q4.5-4 9 0t9 0M3 11q4.5-4 9 0t9 0" opacity=".85" />
-          </svg></div>
-        <div>
-          <div class="v">91,429 <small>km²</small></div>
-          <div class="k">2022 flood extent (UNOSAT VIIRS)</div>
-          <div class="d down">▲ record monsoon · 33 M affected</div>
-        </div>
-      </div>
-      <div class="stat">
-        <div class="ic"><svg viewBox="0 0 24 24" stroke="#f5a623">
-            <path d="M13 3L4 14h6l-1 7 9-11h-6z" />
-          </svg></div>
-        <div>
-          <div class="v"><span id="st-fps">–</span></div>
-          <div class="k">Engine fps · <span id="st-polys">–</span> polys live</div>
-          <div class="d mid" id="st-reproj">reprojection – ms</div>
-        </div>
-      </div>
-      <div class="stat">
-        <div class="ic"><svg viewBox="0 0 24 24" stroke="#34d399">
-            <path d="M4 6h16M4 12h16M4 18h16" opacity=".9" />
-          </svg></div>
-        <div>
-          <div class="v">143,786</div>
-          <div class="k">Animated mesh vertices</div>
-          <div class="d up">stateless fill · every frame, on GPU</div>
-        </div>
-      </div>
-    </section>
+    <div id="main">
+      <!-- ================= dashboard view ================= -->
+      <div id="dashboard-view">
 
-    <!-- ================= map ================= -->
-    <main id="mapwrap">
-      <div id="map"></div>
+        <div id="dashboard-body">
+          <main id="mapwrap">
+            <div id="map"></div>
 
-      <div id="ui" class="panel">
-        <h1>Indus Basin — live water surface</h1>
-        <div class="sub">WebGL surface-fill layer over MapLibre · OSM river geometry</div>
+            <div id="maptoolbar" class="panel">
+              <button class="tabbtn on" id="tab2d" data-view="2d"><svg viewBox="0 0 24 24">
+                  <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zm0 0v16m6-14v16" />
+                </svg>2D Map</button>
+              <button class="tabbtn" id="tab3d" data-view="3d"><svg viewBox="0 0 24 24">
+                  <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z" />
+                  <path d="M12 12l8-4.5M12 12v9M12 12 4 7.5" opacity=".7" />
+                </svg>3D View</button>
+              <span class="divider"></span>
+              <span class="bmwrap">
+                <svg viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" opacity=".7" />
+                </svg>
+                <select id="basemapSelect">
+                  <option value="satellite">Satellite</option>
+                  <option value="terrain">Terrain</option>
+                  <option value="dark">Dark</option>
+                  <option value="streets">Streets</option>
+                </select>
+              </span>
+            </div>
 
-        <div class="grp">
-          <div class="lbl">Basemap / palette</div>
-          <div class="row" id="styles">
-            <button data-style="terrain">terrain</button>
-            <button data-style="satellite" class="on">satellite</button>
-            <button data-style="dark">dark</button>
-            <button data-style="streets">streets</button>
+            <!-- compass rose: rotates with the camera bearing, click resets north -->
+            <button id="compass" title="Reset bearing to north" type="button">
+              <svg viewBox="0 0 48 48" fill="none">
+                <circle cx="24" cy="24" r="19" stroke="rgba(147,197,253,.35)" stroke-width="1" />
+                <circle cx="24" cy="24" r="13.5" stroke="rgba(147,197,253,.22)" stroke-width="1" />
+                <path d="M24 6v4M24 38v4M6 24h4M38 24h4" stroke="rgba(147,197,253,.6)" stroke-width="1.4"
+                  stroke-linecap="round" />
+                <path d="M24 9 29 24 24 21 19 24z" fill="#f43f5e" />
+                <path d="M24 39 19 24 24 27 29 24z" fill="#e2e8f0" />
+                <text x="24" y="7.6" text-anchor="middle" font-size="7" font-weight="800" fill="#7dd3fc"
+                  font-family="ui-sans-serif,Segoe UI,sans-serif">N</text>
+              </svg>
+            </button>
+
+            <div id="mapctrl" class="panel">
+              <button id="ctl-layers" title="Tech-EW hazard layers"><svg viewBox="0 0 24 24">
+                  <path d="M12 3l9 5-9 5-9-5 9-5z" />
+                  <path d="M3 13l9 5 9-5" opacity=".6" />
+                </svg></button>
+              <button id="ctl-edit" title="Measure distance"><svg viewBox="0 0 24 24">
+                  <path d="M3 21l4-1 11-11-3-3L4 17z" />
+                  <path d="M14 6l3 3" />
+                </svg></button>
+              <button id="ctl-refresh" title="Reset view"><svg viewBox="0 0 24 24">
+                  <path d="M4 12a8 8 0 1 1 2.6 5.9" />
+                  <path d="M4 21v-5h5" />
+                </svg></button>
+              <button id="ctl-speed" title="Camera speed"><svg viewBox="0 0 24 24">
+                  <circle cx="12" cy="14" r="7" />
+                  <path d="M12 14l3-3M9 5h6" />
+                </svg><span class="badge2" id="ctl-speed-badge">1x</span></button>
+              <button id="ctl-locate" title="Locate me"><svg viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="2.6" />
+                  <path d="M12 3v3M12 18v3M3 12h3M18 12h3" />
+                </svg></button>
+              <button id="ctl-fullscreen" title="Fullscreen"><svg viewBox="0 0 24 24">
+                  <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+                </svg></button>
+            </div>
+
+            <div id="coordhud" class="panel">
+              <b id="hud-lon">–</b>°E, <b id="hud-lat">–</b>°N &nbsp;·&nbsp; zoom <b id="hud-zoom">–</b> &nbsp;·&nbsp;
+              pitch <b id="hud-pitch">–</b>° &nbsp;·&nbsp; <b id="hud-bearing">–</b>°<span class="qtag"
+                id="hud-quality">HD</span>
+            </div>
+
+            <div id="sevlegend" class="panel">
+              <div style="font-weight:600">Simulation Severity</div>
+              <div class="ramp2"></div>
+              <div class="rampx"><span>Low</span><span>Medium</span><span>High</span><span>Very High</span></div>
+            </div>
+
+            <div id="boot">loading Indus basin geometry…</div>
+
+            <!-- =============================================================
+                 Hidden legacy controls — the ORIGINAL working control surface
+                 for app.js (unmodified render/water engine). The new visible
+                 UI proxies these elements (.click() / value+input) instead of
+                 duplicating engine logic. Never shown; safe to leave in DOM. -->
+            <div id="legacy-controls" hidden aria-hidden="true">
+              <div class="row" id="styles">
+                <button data-style="terrain">terrain</button>
+                <button data-style="satellite" class="on">satellite</button>
+                <button data-style="dark">dark</button>
+                <button data-style="streets">streets</button>
+              </div>
+              <input type="range" id="speed" min="0" max="3" step="0.05" value="1" /><span class="val"
+                id="spdv">1.0×</span>
+              <button id="play" class="on">⏸ Pause</button>
+              <button id="rain">🌧 Rain</button>
+              <div class="row" id="bodies">
+                <button data-bodies="rivers" class="on">rivers</button>
+                <button data-bodies="floods">floods 2022</button>
+                <button data-bodies="both">both</button>
+              </div>
+              <div class="row" id="looks">
+                <button data-look="realistic" class="on">realistic</button>
+                <button data-look="glassy">glassy</button>
+                <button data-look="spec">spec</button>
+              </div>
+              <input type="range" id="opacity" min="0" max="100" step="1" value="0" /><span class="val"
+                id="opv">0%</span>
+              <button id="tour">🎬 Cinematic tour — start</button>
+              <button id="tilt">Tilt 60°</button>
+              <button id="terrain3d" class="on">3D terrain</button>
+              <button id="spin">Orbit</button>
+              <button id="coarse">Coarse projection bug</button>
+              <div id="spots"></div>
+              <span id="fps"></span><span id="drawn"></span><span id="npoly"></span><span id="nvert"></span>
+              <span id="pms"></span><span id="nproj"></span><span id="zoom"></span><span id="pitch"></span>
+
+              <!-- required by effects.js's initFX() — the "Disaster simulations" +
+                   "Boundaries" panel wiring it does at module scope. Real, working
+                   hazard-marker (AdvancedHazardAnimationSystem) and boundary-layer
+                   code lives there; the new Tech-EW Hazards / Boundaries sidebar UI
+                   proxies these exact elements instead of duplicating that logic. -->
+              <select id="hazsel"></select>
+              <button id="haz-show">Show sites</button>
+              <button id="haz-fly">Fly to zone</button>
+              <button id="haz-place">Place ◉</button>
+              <button id="haz-clear">Clear all</button>
+              <span id="hazcount">idle</span>
+              <button id="bdy-pro">Provincial glow</button>
+              <button id="bdy-dis">District lines</button>
+              <span id="bdy-state">overlay off</span>
+            </div>
+          </main>
+
+          <!-- ================= right column ================= -->
+          <aside id="right">
+            <div class="rpanel">
+              <h3>Simulation Controls</h3>
+              <div class="rhero">
+                <div class="rart"></div>
+                <div class="rbtns">
+                  <button class="hero1" id="pt-tour"><svg viewBox="0 0 24 24">
+                      <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z" />
+                      <path d="M10 10.5 15 13l-5 2.5z" fill="currentColor" stroke="none" />
+                    </svg>3D Tour</button>
+                  <button class="hero2" id="pt-locate"><svg viewBox="0 0 24 24">
+                      <path d="M12 21s6-5.7 6-10a6 6 0 1 0-12 0c0 4.3 6 10 6 10z" />
+                      <circle cx="12" cy="11" r="2.2" />
+                    </svg>Locate</button>
+                </div>
+              </div>
+              <div class="qa4">
+                <button id="qa-3d">3D View</button>
+                <button id="qa-reset">Reset View</button>
+                <button id="qa-rotate">Rotate</button>
+                <button id="qa-fullscreen">Fullscreen</button>
+              </div>
+              <div class="subhead">Measure &amp; capture</div>
+              <div class="qa4">
+                <button id="pt-distance">Distance</button>
+                <button id="pt-area">Area</button>
+                <button id="pt-clear">Clear</button>
+                <button id="pt-snapshot">Snapshot</button>
+              </div>
+            </div>
+
+            <div class="rpanel">
+              <h3>Camera &amp; Light <label class="switch small" title="HD rendering"><input type="checkbox"
+                    id="hdToggle" checked /><span class="sl"></span></label></h3>
+              <div class="hdrow">HD rendering <b id="hdState">ON</b></div>
+              <div class="grp">
+                <div class="lbl">Camera Tilt <span class="val" id="tiltval">0°</span></div><input type="range"
+                  id="tiltSlider" min="0" max="85" step="1" value="0" />
+              </div>
+              <div class="grp">
+                <div class="lbl">Time of Day <span class="val" id="todval">12:00</span></div><input type="range"
+                  id="todSlider" min="0" max="24" step="0.25" value="12" />
+              </div>
+            </div>
+
+            <div class="rpanel">
+              <h3>Flood Extent 2022 <label class="switch small" title="Show 2022 flood extent"><input type="checkbox"
+                    id="floodToggle" /><span class="sl"></span></label></h3>
+              <div class="note" id="floodSub">– sheets · – km² (UNOSAT VIIRS)</div>
+              <div class="ddrow"><label>Dataset</label><select id="ddDataset">
+                  <option value="all">All sheets</option>
+                </select></div>
+              <div class="ddrow"><label>Palette</label>
+                <select id="ddPalette">
+                  <option value="satellite">Monsoon (Satellite)</option>
+                  <option value="terrain">Earth (Terrain)</option>
+                  <option value="dark">Midnight (Dark)</option>
+                  <option value="streets">Civic (Streets)</option>
+                </select>
+              </div>
+              <div class="ddrow"><label>Look</label>
+                <select id="ddLook">
+                  <option value="realistic">Realistic</option>
+                  <option value="glassy">Glassy</option>
+                  <option value="spec">Spec</option>
+                </select>
+              </div>
+              <div class="grp">
+                <div class="lbl">Water Opacity <span class="val" id="wopv">100%</span></div><input type="range"
+                  id="wopSlider" min="0" max="100" step="1" value="100" />
+              </div>
+              <label class="chkrow"><input type="checkbox" id="chkRain" /> Rain ripples</label>
+              <label class="chkrow"><input type="checkbox" id="chkRivers" /> Indus rivers</label>
+              <div class="row2"><button id="btnSpread">Replay Spread</button><button id="btnFlow">Indus Flow</button>
+              </div>
+              <div class="note" id="floodFoot" style="margin:8px 0 0">– channel sheets (Natural Earth 10m)</div>
+            </div>
+          </aside>
+        </div>
+
+      </div>
+
+      <!-- ================= generic page (nav-driven) ================= -->
+      <div id="page" hidden>
+        <div class="page-header">
+          <div class="pic" id="pageIcon"></div>
+          <div>
+            <h2 id="pageTitle"></h2>
+            <div class="psub" id="pageSub"></div>
           </div>
         </div>
-
-        <div class="grp">
-          <div class="lbl">Animation <span class="val" id="spdv">1.0×</span></div>
-          <input type="range" id="speed" min="0" max="3" step="0.05" value="1" />
-          <div class="row" style="margin-top:7px">
-            <button id="play" class="on">⏸ Pause</button>
-            <button id="rain">🌧 Rain</button>
-          </div>
-        </div>
-
-        <div class="grp">
-          <div class="lbl">Water bodies</div>
-          <div class="row" id="bodies">
-            <button data-bodies="rivers" class="on">rivers</button>
-            <button data-bodies="floods">floods 2022</button>
-            <button data-bodies="both">both</button>
-          </div>
-        </div>
-
-        <div class="grp">
-          <div class="lbl">Water look</div>
-          <div class="row" id="looks">
-            <button data-look="realistic" class="on">realistic</button>
-            <button data-look="glassy">glassy</button>
-            <button data-look="spec">spec</button>
-          </div>
-        </div>
-
-        <div class="grp">
-          <div class="lbl">Water opacity <span class="val" id="opv">100%</span></div>
-          <input type="range" id="opacity" min="0" max="100" step="1" value="100" />
-        </div>
-
-        <div class="grp">
-          <div class="lbl">Guided tour</div>
-          <div class="row"><button id="tour" style="flex:1">🎬 Cinematic tour — start</button></div>
-        </div>
-
-        <div class="grp">
-          <div class="lbl">Camera</div>
-          <div class="row">
-            <button id="tilt">Tilt 60°</button>
-            <button id="terrain3d" class="on">3D terrain</button>
-            <button id="spin">Orbit</button>
-          </div>
-        </div>
-
-        <div class="grp">
-          <div class="lbl">Fly to</div>
-          <div class="row" id="spots"></div>
-        </div>
-
-        <div class="grp" style="margin-bottom:0">
-          <div class="lbl">Diagnostics</div>
-          <div class="row">
-            <button id="coarse"
-              title="Reproject the mesh through a coarse interpolated lon/lat→screen grid instead of exact per-vertex project() — the classic sliver bug">Coarse
-              projection bug</button>
-          </div>
-        </div>
+        <div id="pageBody"></div>
       </div>
-
-      <div id="hud" class="panel">
-        <div><b id="fps">–</b> fps · <b id="drawn">–</b>/<b id="npoly">–</b> polys drawn · <b id="nvert">–</b> verts
-        </div>
-        <div>reproject <b id="pms">–</b> ms (<b id="nproj">–</b> pts) · zoom <b id="zoom">–</b> · pitch <b
-            id="pitch">–</b>°</div>
-      </div>
-
-      <div id="legend" class="panel">
-        <div style="font-weight:600;margin-bottom:2px">Depth-to-bank (SDF)</div>
-        <div class="ramp"></div>
-        <div class="rampx"><span>bank · foam</span><span>deep</span></div>
-      </div>
-
-      <div id="boot">loading Indus basin geometry…</div>
-    </main>
-
-    <!-- ================= right column ================= -->
-    <aside id="right">
-      <div class="rpanel">
-        <h3>Simulation status <span class="more">LIVE</span></h3>
-        <div class="krow"><span>Engine rate</span><b id="r-fps">–</b></div>
-        <div class="krow"><span>Polygons drawn</span><b id="r-drawn">–</b></div>
-        <div class="krow"><span>Mesh vertices</span><b id="r-verts">–</b></div>
-        <div class="krow"><span>Reprojection</span><b id="r-reproj">–</b></div>
-        <div class="krow"><span>Camera zoom / tilt</span><b id="r-cam">–</b></div>
-        <div class="krow"><span>Active look · palette</span><b id="r-look">–</b></div>
-      </div>
-
-      <div class="rpanel">
-        <h3>Disaster simulations <span class="more" id="hazcount">idle</span></h3>
-        <select id="hazsel"></select>
-        <div class="hazrow">
-          <button id="haz-show">Show sites</button>
-          <button id="haz-fly">Fly to zone</button>
-          <button id="haz-place">Place ◉</button>
-        </div>
-        <div class="hazrow"><button id="haz-clear">Clear all</button></div>
-        <div class="note">Real Pakistan event sites · animated CSS/WebGL FX per severity
-          (storm, fire, quake, GLOF…); icon rings scale to severity. “Place ◉” then
-          click anywhere on the map for a custom event.</div>
-      </div>
-
-      <div class="rpanel">
-        <h3>Admin boundaries</h3>
-        <div class="bdyrow">
-          <button id="bdy-pro">Provincial glow</button>
-          <button id="bdy-dis">District lines</button>
-        </div>
-        <div class="note" id="bdy-state">overlay off — provincial data ships locally;
-          district file drops into <b>portal/geojson/</b></div>
-      </div>
-
-      <div class="rpanel">
-        <h3>Quick actions</h3>
-        <div class="qa">
-          <button id="qa-tour" class="wide">▶ &nbsp;Start cinematic tour (10 scenes)</button>
-          <button id="qa-spread" class="wide">⏵ &nbsp;Flood 2022 — how the water spread</button>
-          <button id="qa-terrain">3D terrain</button>
-          <button id="qa-orbit">Orbit</button>
-          <button id="qa-pause">Pause water</button>
-          <button id="qa-reset">Reset view</button>
-        </div>
-      </div>
-
-      <div class="rpanel">
-        <h3>Water datasets</h3>
-        <div class="ds"><b>VIIRS flood mask, 01–31 Aug 2022 · UNOSAT</b>3,343 fused sheets · 91,429 km² · 83,554 verts
-          <div class="bar"><i style="width:82%"></i></div>
-        </div>
-        <div class="ds"><b>OSM hydrology · riverbank + reservoir</b>308 reaches · 28 braided belts · 9 reservoirs
-          <div class="bar"><i style="width:48%"></i></div>
-        </div>
-        <div class="ds"><b>Natural Earth vector basemap · local</b>land, provinces, 26 city markers · zero network
-          <div class="bar"><i style="width:30%"></i></div>
-        </div>
-      </div>
-
-      <div class="rpanel">
-        <h3>Monitored hotspots <span class="more">fly to</span></h3>
-        <div class="hot" id="hotspots"></div>
-      </div>
-    </aside>
-
-    <!-- ================= alerts strip ================= -->
-    <footer id="alerts">
-      <div class="acard">
-        <div class="a-ic"><svg viewBox="0 0 24 24" stroke="#fb5161">
-            <path d="M12 9v5m0 3.5v.1M10.3 3.8 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0z" />
-          </svg></div>
-        <div><b>Record monsoon footprint</b><span>Aug 2022 · one-third of Pakistan inundated · UNOSAT</span></div>
-      </div>
-      <div class="acard">
-        <div class="a-ic warn"><svg viewBox="0 0 24 24" stroke="#f5a623">
-            <path d="M12 3v3m6.4 2.4 2.1-2.1M9 21a4.5 4.5 0 1 1 .6-8.96A5.5 5.5 0 0 1 20 13.5 3.75 3.75 0 0 1 19.5 21z"
-              opacity=".9" />
-          </svg></div>
-        <div><b>Sindh standing sea, ~100 km</b><span>Dadu–Larkana sheet captured by VIIRS, Aug 31 2022</span></div>
-      </div>
-      <div class="acard">
-        <div class="a-ic warn"><svg viewBox="0 0 24 24" stroke="#f5a623">
-            <path d="M3 18h18M5 18l3.5-12h7L19 18M9 10h6" opacity=".9" />
-          </svg></div>
-        <div><b>Glacial lake outburst risk (GLOF)</b><span>GB &amp; KP ranges — 3,000+ glacial lakes monitored</span>
-        </div>
-      </div>
-      <div class="acard">
-        <div class="a-ic" style="background:rgba(52,211,153,.13)"><svg viewBox="0 0 24 24" stroke="#34d399">
-            <path d="M3 15q4.5-4.5 9 0t9 0M3 19q4.5-4.5 9 0t9 0" opacity=".9" />
-          </svg></div>
-        <div><b>Surface engine nominal</b><span>flow · foam · refraction · reflection · spread replay</span></div>
-      </div>
-    </footer>
+    </div>
   </div>
 
   <script src="./vendor/maplibre-gl.js"></script>
   <script type="module" src="./app.js"></script>
-  <script type="module" src="./dash.js"></script>
   <script type="module" src="./effects.js"></script>
+  <script type="module" src="./hazards.js"></script>
+  <script type="module" src="./boundaries.js"></script>
+  <script type="module" src="./videos.js"></script>
+  <script type="module" src="./measure.js"></script>
+  <script type="module" src="./floodpanel.js"></script>
+  <script type="module" src="./weather.js"></script>
+  <script type="module" src="./dash.js"></script>
+  <script type="module" src="./nav.js"></script>
 </body>
 
 </html>

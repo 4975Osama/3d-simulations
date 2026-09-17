@@ -25,6 +25,23 @@ python3 -m http.server 8080 --bind 0.0.0.0 --directory .    # from the repo root
 # open http://localhost:8080/demo/index.html
 ```
 
+### The portal (with YouTube video uploads)
+
+`portal/` needs the small server in `server/`: it serves the portal and uploads the
+Simex Videos / Hazard Calendars / General Videos pages to your YouTube channel, one
+playlist per page. Google credentials live only in `server/.env`, never in the browser.
+
+```bash
+cd server
+cp .env.example .env     # then fill it in — see the comments in that file
+npm install
+npm start                # open http://localhost:8080/portal/
+```
+
+A plain static server still runs the map, but the video pages will say the portal
+server isn't running. The refresh token needs the full `youtube` scope, and YouTube
+keeps API uploads private until your Cloud project passes its API audit.
+
 ---
 
 ## 1. The module

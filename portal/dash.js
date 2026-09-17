@@ -1,72 +1,64 @@
-/* dashboard glue: mirror live engine stats into the side panels, wire the
-   quick actions to the simulation controls, drive the clock + 3D hotspots.
-   (module runs after app.js — water/map/tour are already window-exposed) */
+/* Dashboard glue: clock, and the topbar search (flies to river/reservoir
+   spots from app.js's #spots, and to Tech-EW hazard sites once hazardData
+   is ready). Page routing lives in nav.js; engine wiring lives in
+   measure.js/floodpanel.js/hazards.js/boundaries.js. */
 
 const $ = (id) => document.getElementById(id);
 
-/* ------------------------------------------------------- clock (PST) */
+/* ------------------------------------------------------- clock */
+function tz() { return 'Asia/Karachi'; }
 function tickClock() {
   const now = new Date();
-  $('clock').textContent = new Intl.DateTimeFormat('en-PK', {
-    hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Karachi' }).format(now);
-  $('date').textContent = new Intl.DateTimeFormat('en-PK', {
-    day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Karachi' }).format(now);
-}
-tickClock(); setInterval(tickClock, 15000);
-
-/* ------------------------------------------------------- live stats mirror */
-function poll() {
-  const t = (id) => ($(id) ? $(id).textContent : '–');
-  $('st-fps').textContent = t('fps') + ' fps';
-  $('st-polys').textContent = t('drawn');
-  $('st-reproj').textContent = 'reprojection ' + t('pms') + ' ms · ' + t('nproj') + ' pts';
-  $('r-fps').textContent = t('fps') + ' fps';
-  $('r-drawn').textContent = t('drawn') + ' / ' + t('npoly');
-  $('r-verts').textContent = t('nvert');
-  $('r-reproj').textContent = t('pms') + ' ms (' + t('nproj') + ' pts)';
-  $('r-cam').textContent = 'z ' + t('zoom') + ' · ' + t('pitch') + '°';
   try {
-    $('r-look').textContent = window.water.getLook().name + ' · ' + window.water.getPalette()
-      + ' · ' + (document.querySelector('#bodies .on')?.dataset.bodies || '');
-  } catch (_) { /* civet */ }
+    $('clock').textContent = new Intl.DateTimeFormat('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: tz() }).format(now);
+    $('date').textContent = new Intl.DateTimeFormat('en-PK', { day: 'numeric', month: 'short', year: 'numeric', timeZone: tz() }).format(now);
+  } catch (_) { /* unknown tz — keep last good value */ }
 }
-setInterval(poll, 600); poll();
+tickClock();
+setInterval(tickClock, 15000);
 
-/* ------------------------------------------------------- quick actions */
-const HERO = { center: [72.86, 34.13], zoom: 11.0, pitch: 28, bearing: 10, offset: [150, -15] };
-$('qa-tour').addEventListener('click', () => $('tour').click());
-$('qa-spread').addEventListener('click', () => {
-  if (!window.tour.isRunning()) $('tour').click();   // starts the tour engine
-  window.tour.play(7);                               // straight to the spread replay
-});
-$('qa-terrain').addEventListener('click', () => $('terrain3d').click());
-$('qa-orbit').addEventListener('click', () => $('spin').click());
-$('qa-pause').addEventListener('click', () => $('play').click());
-$('qa-reset').addEventListener('click', () => {
-  if (window.tour.isRunning()) window.tour.stop();
-  window.map.flyTo({ ...HERO, duration: 2600, essential: true });
-});
-
-/* ------------------------------------------------------- hotspots = fly-to spots */
-{
-  const hot = $('hotspots');
-  [...$('spots').children].forEach((b) => {
-    const chip = document.createElement('button');
-    chip.innerHTML = '<span class="dotx"></span>' + b.textContent;
-    chip.addEventListener('click', () => b.click());
-    hot.appendChild(chip);
-  });
+/* ------------------------------------------------------- search: spots + hazard sites */
+function candidates() {
+  const list = [];
+  document.querySelectorAll('#spots > button').forEach((b) => list.push({ label: b.textContent, kind: 'Water spot', fly: () => b.click() }));
+  if (window.hazardData) {
+    Object.entries(window.hazardData).forEach(([cat, info]) => {
+      info.locations.forEach((loc) => list.push({
+        label: loc.name, kind: info.name,
+        fly: () => window.map.flyTo({ center: loc.coordinates, zoom: 10.5, pitch: 45, duration: 2200, essential: true }),
+      }));
+    });
+  }
+  return list;
 }
 
-/* ------------------------------------------------------- hotspot search */
+let searchResults = null;
+function ensureResults() {
+  if (searchResults) return searchResults;
+  searchResults = document.createElement('div');
+  searchResults.className = 'panel results';
+  searchResults.style.cssText = 'max-height:280px;overflow-y:auto;padding:6px;display:none;';
+  $('search').appendChild(searchResults);
+  return searchResults;
+}
+
 $('q').addEventListener('input', (e) => {
   const s = e.target.value.trim().toLowerCase();
-  [...$('spots').children].forEach((b) => {
-    b.style.display = !s || b.textContent.toLowerCase().includes(s) ? '' : 'none';
-  });
+  const box = ensureResults();
+  if (!s) { box.style.display = 'none'; return; }
+  const hits = candidates().filter((c) => c.label.toLowerCase().includes(s)).slice(0, 8);
+  if (!hits.length) { box.innerHTML = '<div style="padding:8px;color:var(--dim);font-size:12px">No matches</div>'; box.style.display = 'block'; return; }
+  box.innerHTML = hits.map((h, i) => `<button data-i="${i}" style="display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;background:none;border:none;color:var(--txt);padding:7px 9px;border-radius:7px;cursor:pointer;font-size:12px"><span>${h.label}</span><span style="color:var(--dim);font-size:10.5px">${h.kind}</span></button>`).join('');
+  [...box.children].forEach((btn, i) => btn.addEventListener('click', () => { hits[i].fly(); box.style.display = 'none'; e.target.blur(); }));
+  box.style.display = 'block';
 });
 $('q').addEventListener('keydown', (e) => {
   if (e.key !== 'Enter') return;
-  const hit = [...$('spots').children].find((b) => b.style.display !== 'none');
-  if (hit) hit.click();
+  const s = e.target.value.trim().toLowerCase();
+  if (!s) return;
+  const hit = candidates().find((c) => c.label.toLowerCase().includes(s));
+  if (hit) { hit.fly(); ensureResults().style.display = 'none'; }
+});
+document.addEventListener('click', (e) => {
+  if (searchResults && !$('search').contains(e.target)) searchResults.style.display = 'none';
 });

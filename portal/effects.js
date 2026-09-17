@@ -2161,40 +2161,94 @@ const SEV_COLOR = { 'very high': '#ff3b4e', high: '#ff6a00', medium: '#ffb020', 
 const SEV_SIZE = { 'very high': 50, high: 42, medium: 36, low: 30 };
 const sim = { icons: [], placing: false, shown: [] };
 
-function iconChip(hazard, severity) {
+/* icon + name label, structured like the original app's createMarkerElement()
+   in legacy/maplayers.js: the container carries the severity-based size and
+   the image fills it. Severity sizes match the original (50/42/36/30). On the
+   fallback path only (image missing/slow) a coloured ring + two-letter code
+   is drawn instead, matching the fallback contract used elsewhere here. */
+function iconChip(hazard, severity, name) {
   const size = SEV_SIZE[(severity || 'medium').toLowerCase()] || 36;
   const c = SEV_COLOR[(severity || 'medium').toLowerCase()] || '#888';
   const el = document.createElement('div');
-  el.className = 'haz-chip';
-  el.style.cssText = `width:${size}px;height:${size}px;border:2px solid ${c};
-    background:rgba(8,14,24,.88);border-radius:50%;display:grid;place-items:center;
-    font-size:${Math.round(size * .48)}px;box-shadow:0 2px 10px rgba(0,0,0,.55), 0 0 14px ${c}55;
-    cursor:pointer;`;
-  el.style.cssText += `font:700 ${Math.round(size * .36)}px/1 ui-sans-serif,system-ui;
-    color:${
-    SEV_COLOR[(severity || 'medium').toLowerCase()] || '#888'
-  };`;
-  el.textContent = HAZ_ICONS[hazard] || 'EV';
+  el.className = 'haz-marker-wrap';
+  el.style.cssText = `width:${size}px;height:${size}px;`;
+
+  const iconUrl = window.HAZ_ICON_IMG && window.HAZ_ICON_IMG[hazard];
+  if (iconUrl) {
+    const img = document.createElement('img');
+    img.src = iconUrl;
+    img.alt = '';
+    img.onerror = () => { img.remove(); el.insertBefore(textFallback(hazard, size, c), el.firstChild); };
+    el.appendChild(img);
+  } else {
+    el.appendChild(textFallback(hazard, size, c));
+  }
+  if (name) {
+    const label = document.createElement('div');
+    label.className = 'haz-label';
+    label.textContent = name;
+    el.appendChild(label);
+  }
   return el;
+}
+function textFallback(hazard, size, color) {
+  const t = document.createElement('div');
+  t.style.cssText = `width:${size}px;height:${size}px;border:2px solid ${color};background:#fff;
+    border-radius:50%;display:grid;place-items:center;box-shadow:0 2px 10px rgba(0,0,0,.55), 0 0 14px ${color}55;
+    font:700 ${Math.round(size * .36)}px/1 ui-sans-serif,system-ui;color:${color};`;
+  t.textContent = HAZ_ICONS[hazard] || 'EV';
+  return t;
 }
 
 function popupHTML(hazard, loc) {
   const c = SEV_COLOR[(loc.severity || 'medium').toLowerCase()] || '#888';
   const info = hazardData[hazard];
-  return `<div style="font:12.5px/1.5 ui-sans-serif,system-ui;min-width:170px">
-    <div style="font-weight:650;font-size:13px;margin-bottom:1px">${''}<b style="color:#8ea5c4;font-weight:600;letter-spacing:.06em">[${HAZ_ICONS[hazard] || 'EV'}]</b> ${loc.name}</div>
-    <div style="color:#8ea5c4">${info.name} · disaster simulation</div>
-    <div style="margin:6px 0;display:inline-block;padding:1px 9px;border-radius:8px;
-      background:${c}22;border:1px solid ${c}88;color:${c};font-weight:640;font-size:11px">${loc.severity}</div>
-    <div style="color:#8ea5c4;font-size:11px">${loc.coordinates[0].toFixed(3)}°E · ${loc.coordinates[1].toFixed(3)}°N</div>
+  const iconUrl = window.HAZ_ICON_IMG && window.HAZ_ICON_IMG[hazard];
+  const headIcon = iconUrl
+    ? `<img src="${iconUrl}" alt="" onerror="this.remove();this.parentElement.textContent='${HAZ_ICONS[hazard] || 'EV'}'" />`
+    : (HAZ_ICONS[hazard] || 'EV');
+  const feedIcon = iconUrl ? `<img src="${iconUrl}" alt="" onerror="this.remove()" />` : '';
+  return `<div class="hazpopup">
+    <div class="hazpopup-head">
+      <div class="hazpopup-icon">${headIcon}</div>
+      <div><div class="hazpopup-title">${info.name}</div><div class="hazpopup-sub">Hazard Alert</div></div>
+    </div>
+    <div class="hazpopup-grid">
+      <div class="hazpopup-stat"><div class="hazpopup-lbl">Location</div><div class="hazpopup-val">${loc.name}</div></div>
+      <div class="hazpopup-stat"><div class="hazpopup-lbl">Severity</div><div class="hazpopup-val" style="color:${c}">${loc.severity}</div></div>
+    </div>
+    <div class="hazpopup-feedhead"><span>Video Feed</span><span class="hazpopup-live">LIVE</span></div>
+    <div class="hazpopup-feed" style="background:linear-gradient(135deg, ${c}55, ${c}1a 65%, #0b1430)">
+      ${feedIcon}
+      <div class="hazpopup-feedcap">${loc.coordinates[0].toFixed(3)}°E · ${loc.coordinates[1].toFixed(3)}°N</div>
+    </div>
   </div>`;
 }
 
+
+
 function dropHazard(hazard, loc, custom) {
-  const el = iconChip(hazard, loc.severity);
-  const marker = new maplibregl.Marker({ element: el }).setLngLat(loc.coordinates).addTo(map);
-  marker.setPopup(new maplibregl.Popup({ offset: 22, closeButton: false, maxWidth: '240px' })
-    .setHTML(popupHTML(hazard, loc)));
+  const el = iconChip(hazard, loc.severity, loc.name);
+  // anchor 'center' pins the icon's centre to the coordinate so it stays put
+  // through zoom; opacityWhenCovered:1 stops MapLibre fading markers it thinks
+  // the 3D terrain mesh occludes (which washed out sites in valleys/on water)
+  const marker = new maplibregl.Marker({ element: el, anchor: 'center', opacityWhenCovered: '1' })
+    .setLngLat(loc.coordinates).addTo(map);
+  const popup = new maplibregl.Popup({ offset: 18, closeButton: true, maxWidth: '260px' })
+    .setHTML(popupHTML(hazard, loc));
+  marker.setPopup(popup);
+  /* MapLibre's own marker→popup toggle starts with
+       if (this._element.style.opacity === this._opacityWhenCovered) return this;
+     i.e. it ignores clicks on any marker it considers occluded. Because we force
+     opacityWhenCovered:'1' above (so terrain never fades these icons out), that
+     test is always true and the built-in toggle never fires. Open the popup
+     ourselves; stopPropagation keeps the same click from reaching the map, whose
+     closeOnClick handler would otherwise shut it again immediately. */
+  el.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (popup.isOpen()) popup.remove();
+    else popup.setLngLat(loc.coordinates).addTo(map);
+  });
   sim.icons.push(marker);
   hazardFX.addAnimationToMarker(loc.coordinates, hazard,
     (custom ? 'custom-' : 'pre-') + sim.icons.length, loc.severity);
@@ -2263,7 +2317,23 @@ function refreshCount() {
    ============================================================ */
 const bdy = { pro: false, dis: false };
 
+/* Each province gets its own translucent wash (matched to the portal's dashboard
+   palette) with a warm outline, so the provincial overlay reads as a political
+   map rather than a single flat tint. Keys are the 'name' values in
+   geojson/Provincial.geojson; anything unlisted falls back to the layer colour. */
+const PROV_FILL = ['match', ['get', 'name'],
+  'Northern Areas', '#38bdf8',
+  'K.P.', '#34d399',
+  'F.A.T.A.', '#a3e635',
+  'Punjab', '#facc15',
+  'Baluchistan', '#a78bfa',
+  'Sind', '#f472b6',
+  'Azad Kashmir', '#22d3ee',
+  'F.C.T.', '#fb923c',
+  '#38bdf8'];
+
 function bdyLayer(id, url, lineColor, label) {
+  const isPro = id === 'prov';
   fetch(url).then((r) => {
     if (!r.ok) throw new Error(`${url} → HTTP ${r.status}`);
     return r.json();
@@ -2271,9 +2341,11 @@ function bdyLayer(id, url, lineColor, label) {
     if (!map.getSource(id + '-src')) {
       map.addSource(id + '-src', { type: 'geojson', data: gj });
       map.addLayer({ id: id + '-fill', type: 'fill', source: id + '-src',
-        paint: { 'fill-color': lineColor, 'fill-opacity': 0.05 } });
+        paint: { 'fill-color': isPro ? PROV_FILL : lineColor, 'fill-opacity': isPro ? 0.26 : 0.05 } });
       map.addLayer({ id: id + '-line', type: 'line', source: id + '-src',
-        paint: { 'line-color': lineColor, 'line-width': 1.6, 'line-opacity': 0.9 } });
+        paint: isPro
+          ? { 'line-color': '#fde047', 'line-width': 1.8, 'line-opacity': 0.95 }
+          : { 'line-color': lineColor, 'line-width': 1.6, 'line-opacity': 0.9 } });
     }
     map.setLayoutProperty(id + '-fill', 'visibility', 'visible');
     map.setLayoutProperty(id + '-line', 'visibility', 'visible');

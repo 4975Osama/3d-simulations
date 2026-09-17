@@ -108,17 +108,21 @@ let styleName = 'satellite';         // portal boots in the 3D satellite view
 const map = new maplibregl.Map({
   container: 'map',
   style: buildStyle(styleName, data),
-  center: [72.86, 34.13],           // portal hero: Tarbela reservoir, 3D satellite
-  zoom: 11.0,
-  pitch: 28,
-  bearing: 10,
+  center: [70.9717, 28.1495],       // portal hero: whole Indus basin, pulled back
+  zoom: 4.8,
+  pitch: 9,
+  bearing: 0,
   offset: [150, -15],               // lake centres in the visible area (east of the panel)
   maxZoom: 17,
+  maxPitch: 85,                     // dashboard's Camera Tilt slider goes past the 60° default
+  preserveDrawingBuffer: true,      // required for the dashboard's Snapshot tool (canvas.toDataURL)
   attributionControl: { compact: true },
   antialias: true,
 });
-map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
-map.addControl(new maplibregl.ScaleControl({ maxWidth: 110, unit: 'metric' }), 'bottom-right');
+// zoom/compass/scale are custom-drawn in the dashboard's own floating control
+// stack (measure.js) to match its design; ScaleControl stays for the real
+// "100 km" style scale bar readout.
+map.addControl(new maplibregl.ScaleControl({ maxWidth: 110, unit: 'metric' }), 'bottom-left');
 map.dragRotate.enable();
 map.touchZoomRotate.enableRotation();
 
@@ -136,14 +140,18 @@ const markers = places.features.slice(0, 26).map((f) => {
 const canvas = document.createElement('canvas');
 canvas.id = 'water';
 canvas.style.pointerEvents = 'none';
-map.getContainer().appendChild(canvas);
+// inside the canvas container (not the outer map container) so it paints above
+// the basemap canvas but below marker elements, which MapLibre appends here
+// afterwards — otherwise a hazard marker sitting on water is washed out by it
+map.getCanvasContainer().appendChild(canvas);
 
 const gl = canvas.getContext('webgl', {
   alpha: true, stencil: true, antialias: true, premultipliedAlpha: true, depth: false,
 });
 if (!gl) throw new Error('WebGL unavailable');
 
-const DPR = Math.min(window.devicePixelRatio || 1, 2);
+let hdMode = true;   // portal boots in HD (full devicePixelRatio, up to 2x)
+let DPR = Math.min(window.devicePixelRatio || 1, hdMode ? 2 : 1);
 function resize() {
   const { clientWidth: w, clientHeight: h } = map.getContainer();
   canvas.style.width = w + 'px';
@@ -152,6 +160,16 @@ function resize() {
   canvas.height = Math.round(h * DPR);
   water.invalidateProjection();
 }
+// Pro Tools "HD rendering" toggle: SD caps the backing-store resolution at
+// 1x device pixels (cheaper to rasterize on low-power GPUs), HD restores the
+// full (capped 2x) pixel ratio. Exposed on window since dash-side UI code
+// lives outside this module.
+window.setRenderQuality = (hd) => {
+  hdMode = !!hd;
+  DPR = Math.min(window.devicePixelRatio || 1, hdMode ? 2 : 1);
+  resize();
+  water.setPixelRatio(DPR);
+};
 window.addEventListener('resize', resize);
 map.on('resize', resize);
 resize();
@@ -397,3 +415,11 @@ setTimeout(() => { const b = $('boot'); if (b) { b.style.opacity = '0'; setTimeo
 
 window.water = water;   // handy for console poking
 window.map = map;
+
+// real dataset counts for the dashboard's Flood Extent panel — computed once
+// from the actual loaded GeoJSON, not hardcoded.
+window.floodStats = {
+  sheets: floods.features.length,
+  areaKm2: floods.features.reduce((s, f) => s + (f.properties.area_km2 || 0), 0),
+};
+window.riverStats = { reaches: rivers.features.length };

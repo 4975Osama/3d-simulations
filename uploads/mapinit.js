@@ -2467,6 +2467,8 @@ function createMarker(location, hazardType, hazardInfo) {
         '<p style="color:#94a3b8;padding:20px;text-align:center;">Video not supported</p>' +
         '</video>' +
         '</div>' +
+
+
         '</div>' +
         '</div>';
 

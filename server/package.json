@@ -1,0 +1,16 @@
+{
+  "name": "3d-simulation-portal-server",
+  "private": true,
+  "type": "module",
+  "description": "Serves the portal and uploads its videos to YouTube",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20.12"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "multer": "^2.0.2"
+  }
+}
