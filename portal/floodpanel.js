@@ -1,4 +1,4 @@
-/* Flood Extent 2022 panel — Dataset / Palette / Look / Water Opacity / Rain
+/* Flood extent panel — Dataset / Palette / Look / Water Opacity / Rain
    ripples / Indus rivers / Replay Spread / Indus Flow. Everything here
    drives the real water engine (window.water, the hidden #bodies/#looks/
    #opacity/#rain legacy controls app.js is wired to, and the cinematic tour
@@ -6,7 +6,7 @@
 
 const $ = (id) => document.getElementById(id);
 
-function ready() { return window.map instanceof maplibregl.Map && window.water && window.tour && window.floodStats; }
+function ready() { return window.map instanceof window.mapboxgl.Map && window.water && window.tour && window.floodStats; }
 function boot() {
   if (!ready()) { setTimeout(boot, 100); return; }
   init();
@@ -14,10 +14,22 @@ function boot() {
 boot();
 
 function init() {
-  const { sheets, areaKm2 } = window.floodStats;
+  function updateFloodMeta() {
+    const { year, sheets, areaKm2 } = window.getFloodStats();
+    $('floodTitle').textContent = `Flood Extent ${year}`;
+    $('floodSub').textContent = `${sheets.toLocaleString()} sheets · ${Math.round(areaKm2).toLocaleString()} km² · 2026 scenario data`;
+  }
   const { reaches } = window.riverStats;
-  $('floodSub').textContent = `${sheets.toLocaleString()} sheets · ${Math.round(areaKm2).toLocaleString()} km² (UNOSAT VIIRS)`;
   $('floodFoot').textContent = `${reaches.toLocaleString()} channel reaches (OpenStreetMap)`;
+  updateFloodMeta();
+
+  $('datasetToggle').addEventListener('click', (e) => {
+    const button = e.target.closest('button[data-year]');
+    if (!button) return;
+    $('datasetToggle').querySelectorAll('button').forEach((item) => item.classList.toggle('on', item === button));
+    window.setFloodDataset(button.dataset.year);
+    updateFloodMeta();
+  });
 
   /* -------------------------------------------------------- Palette (independent water-colour override) */
   $('ddPalette').addEventListener('change', (e) => window.water.setPalette(e.target.value));

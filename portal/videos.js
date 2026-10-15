@@ -1,4 +1,4 @@
-/* Simex Videos / Hazard Calendars / General Videos pages. Videos live on the
+/* Video category pages. Videos live on the
    portal's YouTube channel, one playlist per page, managed by the portal
    server (server/). The browser never holds Google credentials: it only calls
    /api/*, and uploading requires the server's admin login. */
@@ -21,9 +21,19 @@ const PANELS = {
     icon: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 9.5l5 2.5-5 2.5z" fill="currentColor" stroke="none"/>',
     grad: 'linear-gradient(135deg, #3b82f6, #06b6d4)',
   },
+  simulations2026: {
+    title: '2026 Simulations', sub: 'Emergency simulation exercises for 2026',
+    icon: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h10M7 13h6M7 17h4" opacity=".8"/>',
+    grad: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
+  },
+  simulations2027: {
+    title: '2027 Simulations', sub: 'Emergency simulation exercises for 2027',
+    icon: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h10M7 13h6M7 17h4" opacity=".8"/>',
+    grad: 'linear-gradient(135deg, #14b8a6, #0d9488)',
+  },
 };
 
-const store = { simex: [], calendars: [], general: [] };
+const store = Object.fromEntries(Object.keys(PANELS).map((key) => [key, []]));
 // reachable: null = not checked yet, false = no portal server behind this page
 const state = { reachable: null, configured: false, admin: false, loginEnabled: false, error: '' };
 

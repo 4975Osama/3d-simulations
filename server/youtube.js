@@ -5,11 +5,17 @@
 import fs from 'node:fs';
 import http from 'node:http';
 import https from 'node:https';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
 
 export const CATEGORIES = {
   simex: 'Simex Emergency Videos',
   calendars: 'Hazard Calendars',
   general: 'General Safety Videos',
+  simulations2026: '2026 Simulations',
+  simulations2027: '2027 Simulations',
 };
 
 const EDUCATION_CATEGORY_ID = '27';
@@ -27,23 +33,29 @@ export function createYouTube({
   apiBase = 'https://www.googleapis.com',
 }) {
   function getActiveRefreshToken() {
-    if (process.env.YOUTUBE_REFRESH_TOKEN) return process.env.YOUTUBE_REFRESH_TOKEN;
-    try {
-      const ytTokenFile = path.resolve(here, '../youtube-app/.yt-tokens.json');
-      if (fs.existsSync(ytTokenFile)) {
-        const data = JSON.parse(fs.readFileSync(ytTokenFile, 'utf8'));
-        if (data.refresh_token) return data.refresh_token;
-      }
-    } catch { /* ignore */ }
-    try {
-      const ytEnvFile = path.resolve(here, '../youtube-app/.env.local');
-      if (fs.existsSync(ytEnvFile)) {
-        const envContent = fs.readFileSync(ytEnvFile, 'utf8');
-        const match = envContent.match(/YOUTUBE_REFRESH_TOKEN=(.+)/);
-        if (match && match[1].trim()) return match[1].trim();
-      }
-    } catch { /* ignore */ }
-    return refreshToken;
+    if (process.env.YOUTUBE_REFRESH_TOKEN) return process.env.YOUTUBE_REFRESH_TOKEN.trim();
+
+    for (const candidate of [
+      path.resolve(here, '.env'),
+      path.resolve(here, '../youtube-app/.env.local'),
+      path.resolve(here, '../youtube-app/.yt-tokens.json'),
+    ]) {
+      try {
+        if (!fs.existsSync(candidate)) continue;
+
+        if (candidate.endsWith('.json')) {
+          const data = JSON.parse(fs.readFileSync(candidate, 'utf8'));
+          if (data.refresh_token) return String(data.refresh_token).trim();
+          continue;
+        }
+
+        const envContent = fs.readFileSync(candidate, 'utf8');
+        const match = envContent.match(/(?:^|\n)YOUTUBE_REFRESH_TOKEN=(.*?)(?:\n|$)/);
+        if (match && match[1].trim()) return match[1].trim().replace(/^['"]|['"]$/g, '');
+      } catch { /* ignore */ }
+    }
+
+    return refreshToken ? String(refreshToken).trim() : '';
   }
 
   const isConfigured = () => Boolean(clientId && clientSecret && getActiveRefreshToken());

@@ -1,0 +1,12 @@
+{
+  "name": "3d-simulation2.0",
+  "private": true,
+  "description": "Runs the 3D Simulation Portal server from the project root",
+  "scripts": {
+    "postinstall": "npm --prefix server install",
+    "start": "npm --prefix server start"
+  },
+  "engines": {
+    "node": ">=20.12"
+  }
+}

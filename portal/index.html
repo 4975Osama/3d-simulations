@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
   <link rel="icon" type="image/png" href="./icons/ndma.png" />
   <title>3D Simulation Portal — Pakistan</title>
-  <link rel="stylesheet" href="./vendor/maplibre-gl.css" />
+  <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v3.9.4/mapbox-gl.css" />
   <style>
     :root {
       --bg: #070d1e;
@@ -41,10 +41,23 @@
     overflow: hidden;
     font: 13px / 1.45 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
     color: var(--txt);
-        background: repeating-radial-gradient(black, transparent 100px);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    background: transparent;
 }
+
+    #background-video {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      pointer-events: none;
+    }
+
+    #dash {
+      position: relative;
+      z-index: 1;
+    }
 
     button,
     select,
@@ -762,13 +775,13 @@ nav a, .navbtn {
     /* hazard markers sit above the water overlay + time-of-day tint, so a site
        on open water is never washed out by them; transition:none drops
        MapLibre's own .2s marker fade so the icon is completely static */
-    .maplibregl-marker {
+    .mapboxgl-marker {
       z-index: 3;
       transition: none;
     }
 
     /* an open popup covers the water overlay, markers and their labels */
-    .maplibregl-popup {
+    .mapboxgl-popup {
       z-index: 4;
     }
 
@@ -1047,7 +1060,7 @@ nav a, .navbtn {
     /* icon + label CSS matched to the original app (legacy/maplayers.js:
        .hazard-marker-icon / .marker-label-text) */
     /* This class sits on the MapLibre marker ROOT, which vendor CSS positions
-       with `.maplibregl-marker { position:absolute; left:0; top:0 }` and then
+       with `.mapboxgl-marker { position:absolute; left:0; top:0 }` and then
        offsets by a transform. A `position: relative` here (same specificity,
        later in the cascade) silently won, dropping every icon into normal flow
        so it rendered hundreds of px from its coordinate — while the separate
@@ -1095,17 +1108,17 @@ nav a, .navbtn {
     }
 
     /* ============================== rich hazard popup */
-    .maplibregl-popup-content {
+    .mapboxgl-popup-content {
       padding: 0 !important;
       background: transparent !important;
       box-shadow: none !important;
     }
 
-    .maplibregl-popup-tip {
+    .mapboxgl-popup-tip {
       display: none !important;
     }
 
-    .maplibregl-popup-close-button {
+    .mapboxgl-popup-close-button {
       width: 26px;
       height: 26px;
       font-size: 17px;
@@ -1117,7 +1130,7 @@ nav a, .navbtn {
       top: 12px;
     }
 
-    .maplibregl-popup-close-button:hover {
+    .mapboxgl-popup-close-button:hover {
       background: rgba(255, 255, 255, .38);
     }
 
@@ -1376,31 +1389,31 @@ nav a, .navbtn {
       border-color: rgba(244, 63, 94, .4);
     }
 
-    .maplibregl-ctrl-group {
+    .mapboxgl-ctrl-group {
       background: var(--glass) !important;
       border: 1px solid var(--line2);
     }
 
-    .maplibregl-ctrl-group button+button {
+    .mapboxgl-ctrl-group button+button {
       border-top: 1px solid var(--line);
     }
 
     /* attribution stays visible (it is required) but themed to the dark map card */
-    .maplibregl-ctrl-attrib {
+    .mapboxgl-ctrl-attrib {
       background: rgba(11, 20, 44, .82) !important;
       color: #b4c2e0 !important;
       border-radius: 8px 0 0 0;
     }
 
-    .maplibregl-ctrl-attrib a {
+    .mapboxgl-ctrl-attrib a {
       color: #93c5fd !important;
     }
 
-    .maplibregl-ctrl-attrib-button {
+    .mapboxgl-ctrl-attrib-button {
       filter: invert(1) hue-rotate(180deg) brightness(1.4);
     }
 
-    .maplibregl-ctrl-scale {
+    .mapboxgl-ctrl-scale {
       background: rgba(11, 20, 44, .8) !important;
       border-color: rgba(147, 197, 253, .55) !important;
       color: #dbe6ff !important;
@@ -1684,6 +1697,33 @@ nav a, .navbtn {
     .ddrow select option {
       background: #0f1b3d;
       color: var(--txt);
+    }
+
+    .dataset-toggle {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      flex: 1;
+    }
+
+    .dataset-toggle button {
+      font: inherit;
+      font-size: 11px;
+      font-weight: 700;
+      color: #cbd6ef;
+      background: rgba(9, 16, 38, .85);
+      border: 1px solid var(--line2);
+      border-radius: 9px;
+      padding: 7px 5px;
+      cursor: pointer;
+    }
+
+    .dataset-toggle button:hover,
+    .dataset-toggle button.on {
+      color: #fff;
+      background: var(--pcg);
+      border-color: transparent;
+      box-shadow: 0 10px 20px -12px var(--pc);
     }
 
     .chkrow {
@@ -2276,6 +2316,9 @@ nav a, .navbtn {
 </head>
 
 <body>
+  <video id="background-video" autoplay muted loop playsinline aria-hidden="true">
+    <source src="/bg-video.mp4" type="video/mp4" />
+  </video>
   <div id="dash">
 
     <!-- ================= sidebar ================= -->
@@ -2320,6 +2363,14 @@ nav a, .navbtn {
             <rect x="3" y="5" width="18" height="14" rx="2" />
             <path d="M10 9.5l5 2.5-5 2.5z" fill="currentColor" stroke="none" />
           </svg>General Videos</a>
+        <a data-page="simulations2026" href="#"><svg viewBox="0 0 24 24">
+            <rect x="3" y="5" width="18" height="14" rx="2" />
+            <path d="M7 9h10M7 13h6M7 17h4" opacity=".8" />
+          </svg>2026 Simulations</a>
+        <a data-page="simulations2027" href="#"><svg viewBox="0 0 24 24">
+            <rect x="3" y="5" width="18" height="14" rx="2" />
+            <path d="M7 9h10M7 13h6M7 17h4" opacity=".8" />
+          </svg>2027 Simulations</a>
 
       </nav>
 
@@ -2550,12 +2601,15 @@ nav a, .navbtn {
             </div>
 
             <div class="rpanel">
-              <h3>Flood Extent 2022 <label class="switch small" title="Show 2022 flood extent"><input type="checkbox"
+              <h3><span id="floodTitle">Flood Extent 2022</span> <label class="switch small" title="Show selected flood extent"><input type="checkbox"
                     id="floodToggle" /><span class="sl"></span></label></h3>
               <div class="note" id="floodSub">– sheets · – km² (UNOSAT VIIRS)</div>
-              <div class="ddrow"><label>Dataset</label><select id="ddDataset">
-                  <option value="all">All sheets</option>
-                </select></div>
+                <div class="ddrow"><label>Dataset</label>
+                  <div class="dataset-toggle" id="datasetToggle" role="group" aria-label="Flood dataset">
+                    <button type="button" class="on" data-year="2022">2022</button>
+                    <button type="button" data-year="2026">2026</button>
+                  </div>
+                </div>
               <div class="ddrow"><label>Palette</label>
                 <select id="ddPalette">
                   <option value="satellite">Monsoon (Satellite)</option>
@@ -2600,10 +2654,12 @@ nav a, .navbtn {
     </div>
   </div>
 
-  <script src="./vendor/maplibre-gl.js"></script>
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.9.4/mapbox-gl.js"></script>
+  <script src="./config.js"></script>
   <script type="module" src="./app.js"></script>
   <script type="module" src="./effects.js"></script>
   <script type="module" src="./hazards.js"></script>
+  <script type="module" src="./twin.js"></script>
   <script type="module" src="./boundaries.js"></script>
   <script type="module" src="./videos.js"></script>
   <script type="module" src="./measure.js"></script>

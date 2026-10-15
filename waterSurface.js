@@ -1413,6 +1413,7 @@ export function createWaterSurface(defaults = {}) {
     let drawn = 0;
     for (const p of polys) {
       if (!p.visible || p.activeLod < 0) continue;
+      if (p.fill != null && p.fill <= 0.002) continue;   // dry right now (setFills)
       const L = p.lods[p.activeLod];
       if (!L.buffer || !L.drawCount) continue;
 
@@ -1460,7 +1461,9 @@ export function createWaterSurface(defaults = {}) {
       gl.useProgram(prog);
       gl.uniform2f(loc.u_flow, p.flow[0], p.flow[1]);
       gl.uniform1f(loc.u_scroll, p.scroll);
-      gl.uniform1f(loc.u_growStart, p.reveal != null ? p.reveal : -1.0);
+      // per-polygon fill (setFills) overrides the shared clock: start 0, clock = fill * window
+      if (p.fill != null) { gl.uniform1f(loc.u_growStart, 0.0); gl.uniform1f(loc.u_grow, p.fill * 0.16); }
+      else { gl.uniform1f(loc.u_growStart, p.reveal != null ? p.reveal : -1.0); gl.uniform1f(loc.u_grow, growT); }
       // ripple scale follows how many pixels this polygon covers right now
       gl.uniform1f(loc.u_detail, look.detail
         ? Math.max(1, Math.min(look.maxDetail, (p.pxSpan || 0) / (look.detailDiv || 900)))
@@ -1553,6 +1556,16 @@ export function createWaterSurface(defaults = {}) {
      *  out to their mapped shoreline while the clock passes their delay;
      *  everything else renders exactly as before. Default 1 (fully spread). */
     setGrow(t) { growT = Math.max(0, Math.min(1, Number.isFinite(+t) ? +t : 1)); return api; },
+    /** per-polygon fill [0..1] by feature index (array or fn(index)); a polygon
+        with a fill ignores setGrow and fills interior-out to that fraction.
+        null / undefined entries fall back to the shared clock. */
+    setFills(f) {
+      for (const p of polys) {
+        const v = typeof f === 'function' ? f(p.index) : f && f[p.index];
+        p.fill = v == null ? null : Math.max(0, Math.min(1, +v));
+      }
+      return api;
+    },
     getGrow() { return growT; },
     /** map pitch in degrees — feeds u_pitch (grazing-view reflection boost).
      *  Not needed if you pass map.getPitch() as render()'s 5th argument. */

@@ -10,6 +10,8 @@ const RENDERERS = {
   simex: () => window.renderVideoPage('simex'),
   calendars: () => window.renderVideoPage('calendars'),
   general: () => window.renderVideoPage('general'),
+  simulations2026: () => window.renderVideoPage('simulations2026'),
+  simulations2027: () => window.renderVideoPage('simulations2027'),
 };
 
 function setActive(key) {

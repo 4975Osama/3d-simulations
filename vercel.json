@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "https://3d-simulation-portal.vercel.app/api/:path*" },
+    { "source": "/waterSurface.js", "destination": "/waterSurface.js" },
+    { "source": "/bg-video.mp4", "destination": "/bg video.mp4" },
+    { "source": "/", "destination": "/portal/index.html" },
+    { "source": "/:path*", "destination": "/portal/:path*" }
+  ]
+}

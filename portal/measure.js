@@ -10,7 +10,7 @@ const $ = (id) => document.getElementById(id);
 
 const HERO = { center: [72.86, 34.13], zoom: 11.0, pitch: 28, bearing: 10, offset: [150, -15] };
 
-function ready() { return window.map instanceof maplibregl.Map && window.water; }
+function ready() { return window.map instanceof window.mapboxgl.Map && window.water; }
 function boot() {
   if (!ready()) { setTimeout(boot, 100); return; }
   init();
@@ -191,7 +191,7 @@ function init() {
       if (userMarker) userMarker.remove();
       const el = document.createElement('div');
       el.style.cssText = 'width:16px;height:16px;border-radius:50%;background:#38b6ff;border:3px solid #fff;box-shadow:0 0 0 4px rgba(56,182,255,.35)';
-      userMarker = new maplibregl.Marker({ element: el }).setLngLat([longitude, latitude]).addTo(map);
+      userMarker = new mapboxgl.Marker({ element: el }).setLngLat([longitude, latitude]).addTo(map);
       map.flyTo({ center: [longitude, latitude], zoom: 12.5, pitch: 45, duration: 2200, essential: true });
       if (window.setWeatherLocation) window.setWeatherLocation(latitude, longitude, 'My location');
     }, (err) => {

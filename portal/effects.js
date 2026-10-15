@@ -1958,7 +1958,7 @@ class AdvancedHazardAnimationSystem {
             this.applyFloodWrapperState(animation.querySelector('.flood-scale-wrapper'));
         }
 
-        const animationMarker = new mapboxgl.Marker({
+        const animationMarker = new window.mapboxgl.Marker({
             element: animation,
             anchor: 'center'
         })
@@ -2139,7 +2139,7 @@ const hazardData = {
 /* resolve map + wire everything once the app has finished booting */
 function initFX() {
 // map / mapboxgl aliases for the ported class body above
-  map = window.map; mapboxgl = maplibregl;
+  map = window.map; mapboxgl = window.mapboxgl;
 /* ============================================================
    Portal integration: instantiates the ported system
    (runs inside initFX — after app boot)
@@ -2232,9 +2232,9 @@ function dropHazard(hazard, loc, custom) {
   // anchor 'center' pins the icon's centre to the coordinate so it stays put
   // through zoom; opacityWhenCovered:1 stops MapLibre fading markers it thinks
   // the 3D terrain mesh occludes (which washed out sites in valleys/on water)
-  const marker = new maplibregl.Marker({ element: el, anchor: 'center', opacityWhenCovered: '1' })
+  const marker = new window.mapboxgl.Marker({ element: el, anchor: 'center', opacityWhenCovered: '1' })
     .setLngLat(loc.coordinates).addTo(map);
-  const popup = new maplibregl.Popup({ offset: 18, closeButton: true, maxWidth: '260px' })
+  const popup = new window.mapboxgl.Popup({ offset: 18, closeButton: true, maxWidth: '260px' })
     .setHTML(popupHTML(hazard, loc));
   marker.setPopup(popup);
   /* MapLibre's own marker→popup toggle starts with
@@ -2381,7 +2381,7 @@ document.getElementById('bdy-dis').addEventListener('click', () => toggleBdy('di
 /* note: id-adorned elements alias onto window (window.map === the #map div,
    window.tour === the #tour button) until app.js assigns the real engine
    objects — so the readiness test must be type-based, not truthy-based */
-const fxReady = () => (window.map instanceof maplibregl.Map)
+const fxReady = () => (window.map instanceof window.mapboxgl.Map)
   && typeof window.tour?.start === 'function';
 if (fxReady()) initFX();
 else {

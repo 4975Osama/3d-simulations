@@ -67,23 +67,32 @@ function buildStyle(name, data) {
                'circle-color': s.city, 'circle-opacity': 0.9,
                'circle-stroke-width': 1, 'circle-stroke-color': 'rgba(0,0,0,.35)' } },
   );
-  return { version: 8, sources, layers };
+  // sky above the horizon when tilted, so the page's background video never shows through
+  const dark = s.label === 'dark';
+  const fog = {
+    color: dark ? '#0b1522' : '#cfd8e3',
+    'high-color': dark ? '#16304f' : '#8fb4dc',
+    'horizon-blend': 0.08,
+    'space-color': dark ? '#02040a' : '#4a6c97',
+    'star-intensity': dark ? 0.6 : 0,
+    range: [0.5, 10],
+  };
+  return { version: 8, sources, layers, fog };
 }
 
 /* ------------------------------------------------------------------------ data */
 
-const [land, provinces, places, rivers, floods] = await Promise.all(
-  ['land', 'provinces', 'places', 'pk_rivers', 'pk_floods'].map((f) =>
+const [land, provinces, places, rivers, floods2022, floods2026] = await Promise.all(
+  ['land', 'provinces', 'places', 'pk_rivers', 'pk_floods', 'pk_floods_2026'].map((f) =>
     fetch(`./public/${f}.geojson`).then((r) => r.json()))
 );
+const floodDatasets = { '2022': floods2022, '2026': floods2026 };
+window.floodDatasets = floodDatasets;   // read by twin.js (digital twin)
+let selectedFloodDataset = '2022';
+const floods = floodDatasets[selectedFloodDataset];
 const data = { land, provinces, places, rivers, floods };
 
-/* stage the 2022 inundation replay: every flood sheet gets a `reveal` delay
-   on the setGrow() clock, ordered north -> south by polygon latitude, so the
-   cinematic scene can replay how the water spread from the Punjab belts down
-   through Sindh (0 = first, 0.84 = last; the fill itself is inside-out:
-   interiors first, shoreline last — handled by the shader). */
-{
+function stageFloodReplay(collection) {
   let lo = Infinity, hi = -Infinity;
   const lat = (f) => {
     const ring = f.geometry.type === 'MultiPolygon'
@@ -92,21 +101,31 @@ const data = { land, provinces, places, rivers, floods };
     for (let i = 0; i < ring.length; i += 4) { s += ring[i][1]; n++; }
     return s / Math.max(1, n);
   };
-  for (const f of floods.features) {
+  for (const f of collection.features) {
     const y = lat(f);
     f.properties.reveal = y;
     if (y < lo) lo = y; if (y > hi) hi = y;
   }
-  for (const f of floods.features) {
-    f.properties.reveal = ((hi - f.properties.reveal) / (hi - lo)) * 0.84;
+  for (const f of collection.features) {
+    f.properties.reveal = hi === lo ? 0 : ((hi - f.properties.reveal) / (hi - lo)) * 0.84;
   }
 }
+
+/* Stage each inundation replay: every flood sheet gets a `reveal` delay
+   on the setGrow() clock, ordered north -> south by polygon latitude, so the
+   cinematic scene can replay how the water spread from the Punjab belts down
+   through Sindh (0 = first, 0.84 = last; the fill itself is inside-out:
+   interiors first, shoreline last — handled by the shader). */
+stageFloodReplay(floods2022);
+stageFloodReplay(floods2026);
 
 /* ------------------------------------------------------------------------- map */
 
 let styleName = 'satellite';         // portal boots in the 3D satellite view
-const map = new maplibregl.Map({
+mapboxgl.accessToken = window.MAPBOX_TOKEN;
+const map = new mapboxgl.Map({
   container: 'map',
+  projection: 'mercator',
   style: buildStyle(styleName, data),
   center: [70.9717, 28.1495],       // portal hero: whole Indus basin, pulled back
   zoom: 4.8,
@@ -122,7 +141,7 @@ const map = new maplibregl.Map({
 // zoom/compass/scale are custom-drawn in the dashboard's own floating control
 // stack (measure.js) to match its design; ScaleControl stays for the real
 // "100 km" style scale bar readout.
-map.addControl(new maplibregl.ScaleControl({ maxWidth: 110, unit: 'metric' }), 'bottom-left');
+map.addControl(new mapboxgl.ScaleControl({ maxWidth: 110, unit: 'metric' }), 'bottom-left');
 map.dragRotate.enable();
 map.touchZoomRotate.enableRotation();
 
@@ -131,7 +150,7 @@ const markers = places.features.slice(0, 26).map((f) => {
   const el = document.createElement('div');
   el.className = 'marker' + (STYLES[styleName].label === 'light' ? ' light' : '');
   el.textContent = f.properties.name;
-  return new maplibregl.Marker({ element: el, anchor: 'left' })
+  return new mapboxgl.Marker({ element: el, anchor: 'left' })
     .setLngLat(f.geometry.coordinates).addTo(map);
 });
 
@@ -185,8 +204,8 @@ function setBodies(mode) {
   console.time('[demo] setPolygons (triangulate + SDF rasters)');
   const feats =
     mode === 'rivers' ? rivers.features :
-    mode === 'floods' ? floods.features :
-    rivers.features.concat(floods.features);
+    mode === 'floods' ? floodDatasets[selectedFloodDataset].features :
+    rivers.features.concat(floodDatasets[selectedFloodDataset].features);
   water.setPolygons({ type: 'FeatureCollection', features: feats }, {
     // the caller owns the hydrology: flow bearing (deg) and mean surface speed (m/s)
     // (flood features carry no bearing -> dominant-axis fallback, speed 0.15 -> calm)
@@ -199,6 +218,22 @@ function setBodies(mode) {
   $('nvert').textContent = st.vertices.toLocaleString();
 }
 setBodies('rivers');
+
+window.setFloodDataset = (year) => {
+  if (!floodDatasets[year]) return;
+  selectedFloodDataset = year;
+  window.floodStats = getFloodStats();
+  if (bodiesMode === 'floods' || bodiesMode === 'both') setBodies(bodiesMode);
+};
+window.getFloodStats = () => getFloodStats();
+function getFloodStats() {
+  const collection = floodDatasets[selectedFloodDataset];
+  return {
+    year: selectedFloodDataset,
+    sheets: collection.features.length,
+    areaKm2: collection.features.reduce((s, f) => s + (f.properties.area_km2 || 0), 0),
+  };
+}
 
 ['move', 'zoom', 'rotate', 'pitch', 'moveend'].forEach((e) =>
   map.on(e, () => water.invalidateProjection()));
@@ -399,9 +434,8 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 map.once('load', () => {
-  const boot = $('boot');
-  boot.style.opacity = '0';
-  setTimeout(() => boot.remove(), 600);
+  const boot = $('boot');   // may already be gone: the 4 s fallback below removes it on slow loads
+  if (boot) { boot.style.opacity = '0'; setTimeout(() => boot.remove(), 600); }
   // portal boots in 3D: satellite + terrain + gentle oblique camera
   if (!map.getSource('dem')) {
     map.addSource('dem', {
@@ -418,8 +452,5 @@ window.map = map;
 
 // real dataset counts for the dashboard's Flood Extent panel — computed once
 // from the actual loaded GeoJSON, not hardcoded.
-window.floodStats = {
-  sheets: floods.features.length,
-  areaKm2: floods.features.reduce((s, f) => s + (f.properties.area_km2 || 0), 0),
-};
+window.floodStats = getFloodStats();
 window.riverStats = { reaches: rivers.features.length };

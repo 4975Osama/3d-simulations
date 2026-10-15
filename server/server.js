@@ -43,6 +43,7 @@ app.disable('x-powered-by');
 app.get('/', (req, res) => res.redirect('/portal/'));
 app.use('/portal', express.static(path.join(root, 'portal')));
 app.get('/waterSurface.js', (req, res) => res.sendFile(path.join(root, 'waterSurface.js')));
+app.get('/bg-video.mp4', (req, res) => res.sendFile(path.join(root, 'bg video.mp4')));
 
 /* ---------------------------------------------------------------- admin session */
 const COOKIE = 'portal_admin';
@@ -73,6 +74,57 @@ function requireYouTube(req, res, next) {
   if (youtube.configured) return next();
   res.status(503).json({ error: 'YouTube isn\'t connected — add your Google credentials to server/.env.' });
 }
+
+/* ---------------------------------------------------------------- OSM buildings
+   Digital Twin city mode: proxies one bbox of OpenStreetMap building footprints
+   from Overpass, converts them to GeoJSON and caches the result on disk, so
+   each area only hits the public Overpass API once. */
+const OSM_CACHE = path.join(here, 'cache', 'osm-buildings');
+const OVERPASS_URL = env.OVERPASS_URL || 'https://overpass-api.de/api/interpreter';
+const osmPending = new Map();
+
+async function fetchOsmBuildings([s, w, n, e], file) {
+  const query = `[out:json][timeout:60];way["building"](${s},${w},${n},${e});out tags geom;`;
+  const res = await fetch(OVERPASS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': '3d-simulation-portal/1.0' },
+    body: new URLSearchParams({ data: query }),
+    signal: AbortSignal.timeout(90_000),
+  });
+  if (!res.ok) throw new Error(`Overpass HTTP ${res.status}`);
+  const { elements = [] } = await res.json();
+  const features = [];
+  for (const el of elements) {
+    if (el.type !== 'way' || !el.geometry || el.geometry.length < 4) continue;
+    const ring = el.geometry.map((p) => [+p.lon.toFixed(6), +p.lat.toFixed(6)]);
+    const t = el.tags || {};
+    const h = parseFloat(t.height) || (parseFloat(t['building:levels']) * 3.2) || 7;
+    features.push({ type: 'Feature', id: features.length + 1, properties: { h: Math.min(300, h) }, geometry: { type: 'Polygon', coordinates: [ring] } });
+  }
+  fs.mkdirSync(OSM_CACHE, { recursive: true });
+  fs.writeFileSync(file + '.tmp', JSON.stringify({ type: 'FeatureCollection', features }));
+  fs.renameSync(file + '.tmp', file);
+}
+
+app.get('/api/osm-buildings', async (req, res, next) => {
+  const b = ['s', 'w', 'n', 'e'].map((k) => Number(req.query[k]));
+  const [s, w, n, e] = b;
+  if (b.some((v) => !Number.isFinite(v)) || n <= s || e <= w || n - s > 0.12 || e - w > 0.15 || Math.abs(s) > 85 || Math.abs(n) > 85) {
+    return res.status(400).json({ error: 'Invalid bbox.' });
+  }
+  const key = b.map((v) => v.toFixed(3)).join('_');
+  const file = path.join(OSM_CACHE, `${key}.json`);
+  try {
+    if (!fs.existsSync(file)) {
+      if (!osmPending.has(key)) osmPending.set(key, fetchOsmBuildings(b, file).finally(() => osmPending.delete(key)));
+      await osmPending.get(key);
+    }
+    res.type('json').sendFile(file);
+  } catch (err) {
+    console.warn('[osm-buildings]', err.message);
+    res.status(502).json({ error: 'OpenStreetMap buildings unavailable right now.' });
+  }
+});
 
 /* ---------------------------------------------------------------- api */
 app.get('/api/session', (req, res) => {
