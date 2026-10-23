@@ -1428,18 +1428,9 @@ class AdvancedHazardAnimationSystem {
             scaleWrapper.appendChild(ripple);
         }
 
-        // Rain drops
-        const rainCount = severity === 'Very High' ? 110 : severity === 'High' ? 85 : 60;
-        for (let i = 0; i < rainCount; i++) {
-            const drop = document.createElement('div');
-            drop.className = 'rain-drop';
-            drop.style.left = `${Math.random() * 100}%`;
-            drop.style.height = `${8 + Math.random() * 12}px`;
-            drop.style.setProperty('--windOffset', `${-5 + Math.random() * 10}px`);
-            drop.style.animationDuration = `${0.4 + Math.random() * 0.3}s`;
-            drop.style.animationDelay = `${Math.random() * 1.5}s`;
-            scaleWrapper.appendChild(drop);
-        }
+        // The rain itself falls in 3D from a storm cloud over the site
+        // (storm3d.js, registered in addAnimationToMarker) instead of as flat
+        // screen streaks; this marker keeps the ground effects.
 
         // Splashes
         for (let i = 0; i < 8; i++) {
@@ -1448,31 +1439,6 @@ class AdvancedHazardAnimationSystem {
             splash.style.left = `${15 + Math.random() * 70}%`;
             splash.style.animationDelay = `${Math.random() * 1}s`;
             scaleWrapper.appendChild(splash);
-        }
-
-        // Thunderstorm - lightning flashes + bolt streaks. Each bolt shares
-        // its flash's exact duration/delay so they fire together, and every
-        // instance gets its own randomized timing so multiple markers don't
-        // flash in sync with each other.
-        const lightningCount = severity === 'Very High' ? 3 : severity === 'High' ? 2 : 1;
-        for (let i = 0; i < lightningCount; i++) {
-            const timing = {
-                duration: `${4 + Math.random() * 5}s`,
-                delay: `${Math.random() * 6}s`
-            };
-
-            const flash = document.createElement('div');
-            flash.className = 'storm-sky-flash';
-            flash.style.animationDuration = timing.duration;
-            flash.style.animationDelay = timing.delay;
-            scaleWrapper.appendChild(flash);
-
-            const bolt = document.createElement('div');
-            bolt.className = 'storm-bolt';
-            bolt.style.left = `${20 + Math.random() * 60}%`;
-            bolt.style.animationDuration = timing.duration;
-            bolt.style.animationDelay = timing.delay;
-            scaleWrapper.appendChild(bolt);
         }
 
         return container;
@@ -1956,6 +1922,8 @@ class AdvancedHazardAnimationSystem {
 
         if (hazardType === 'floods') {
             this.applyFloodWrapperState(animation.querySelector('.flood-scale-wrapper'));
+            // rain + lightning: a 3D storm cell above the site
+            window.storm3d?.addCell({ id: markerId, lngLat: coordinates, severity });
         }
 
         const animationMarker = new window.mapboxgl.Marker({
@@ -1986,6 +1954,7 @@ class AdvancedHazardAnimationSystem {
                 }
             });
             this.activeAnimations.delete(hazardType);
+            if (hazardType === 'floods') window.storm3d?.clearCells();
         }
     }
 
@@ -2003,6 +1972,7 @@ class AdvancedHazardAnimationSystem {
             });
         });
         this.activeAnimations.clear();
+        window.storm3d?.clearCells();
     }
 }
 
@@ -2217,7 +2187,7 @@ function popupHTML(hazard, loc) {
       <div class="hazpopup-stat"><div class="hazpopup-lbl">Location</div><div class="hazpopup-val">${loc.name}</div></div>
       <div class="hazpopup-stat"><div class="hazpopup-lbl">Severity</div><div class="hazpopup-val" style="color:${c}">${loc.severity}</div></div>
     </div>
-    <div class="hazpopup-feedhead"><span>Video Feed</span><span class="hazpopup-live">LIVE</span></div>
+    <div class="hazpopup-feedhead"><span>Video Feed</span><button type="button" class="hazpopup-up" data-up>Upload</button><span class="hazpopup-live">LIVE</span></div>
     <div class="hazpopup-feed" style="background:linear-gradient(135deg, ${c}55, ${c}1a 65%, #0b1430)">
       ${feedIcon}
       <div class="hazpopup-feedcap">${loc.coordinates[0].toFixed(3)}°E · ${loc.coordinates[1].toFixed(3)}°N</div>
@@ -2226,6 +2196,37 @@ function popupHTML(hazard, loc) {
 }
 
 
+
+/* ---- the popup's video feed: each site can carry one uploaded video
+   (stored by the portal server in Neon; videos.js does the upload). It shows
+   as a still with a play button and streams only when clicked, to keep the
+   storage's monthly traffic allowance for real viewing. */
+const siteKey = (hazard, loc) => `${hazard}:${loc.coordinates[0].toFixed(4)},${loc.coordinates[1].toFixed(4)}`;
+const escHTML = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+
+async function fillFeed(popup, hazard, loc) {
+  const root = popup.getElement(), pv = window.portalVideos;
+  if (!root || !pv) return;
+  const feed = root.querySelector('.hazpopup-feed'), badge = root.querySelector('.hazpopup-live'), up = root.querySelector('[data-up]');
+  const key = siteKey(hazard, loc);
+  up.onclick = async () => {
+    const title = `${hazardData[hazard].name} · ${loc.name}`;
+    const video = await pv.uploadSiteVideo(key, title, loc.name);
+    if (video && popup.isOpen()) fillFeed(popup, hazard, loc);
+  };
+  const v = (await pv.siteVideos())[key];
+  if (!popup.isOpen() || feed.dataset.video === (v && v.id)) return;
+  up.textContent = v ? 'Replace' : 'Upload';
+  if (!v) return;                                     // no video yet: keep the illustration
+  feed.dataset.video = v.id;
+  badge.textContent = 'VIDEO';
+  badge.classList.add('rec');
+  const date = new Date(v.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  const cap = `<div class="hazpopup-feedcap">${escHTML(v.title)} · ${date}</div>`;
+  feed.innerHTML = (v.thumbnail ? `<img class="hazpopup-thumb" src="${escHTML(v.thumbnail)}" alt="" />` : '')
+    + `<button type="button" class="hazpopup-play" title="Play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>` + cap;
+  feed.querySelector('.hazpopup-play').onclick = () => { feed.innerHTML = pv.playerHTML(v); };
+}
 
 function dropHazard(hazard, loc, custom) {
   const el = iconChip(hazard, loc.severity, loc.name);
@@ -2236,6 +2237,7 @@ function dropHazard(hazard, loc, custom) {
     .setLngLat(loc.coordinates).addTo(map);
   const popup = new window.mapboxgl.Popup({ offset: 18, closeButton: true, maxWidth: '260px' })
     .setHTML(popupHTML(hazard, loc));
+  popup.on('open', () => fillFeed(popup, hazard, loc));
   marker.setPopup(popup);
   /* MapLibre's own marker→popup toggle starts with
        if (this._element.style.opacity === this._opacityWhenCovered) return this;

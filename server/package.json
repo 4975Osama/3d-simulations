@@ -2,15 +2,17 @@
   "name": "3d-simulation-portal-server",
   "private": true,
   "type": "module",
-  "description": "Serves the portal and uploads its videos to YouTube",
+  "description": "Serves the portal and stores its videos (Cloudflare R2 files + Neon Postgres records)",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "setup": "node setup.js"
   },
   "engines": {
     "node": ">=20.12"
   },
   "dependencies": {
-    "express": "^5.1.0",
-    "multer": "^2.0.2"
+    "@neondatabase/serverless": "^1.2.0",
+    "aws4fetch": "^1.0.20",
+    "express": "^5.1.0"
   }
 }

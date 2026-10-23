@@ -1,7 +1,8 @@
-/* Video category pages. Videos live on the
-   portal's YouTube channel, one playlist per page, managed by the portal
-   server (server/). The browser never holds Google credentials: it only calls
-   /api/*, and uploading requires the server's admin login. */
+/* Video category pages. The files live in the portal's Neon Object Storage
+   bucket and their details in its Neon database, both managed by the portal server
+   (server/). The browser never holds storage keys: it only calls /api/*, and
+   adding or deleting videos requires the server's admin login. Uploads go
+   straight from the browser to the bucket through short-lived signed links. */
 
 const $ = (id) => document.getElementById(id);
 
@@ -45,7 +46,7 @@ async function getJSON(url, options) {
 }
 
 async function loadAll() {
-  // settled separately: a failing video list (e.g. a revoked YouTube token)
+  // settled separately: a failing video list (e.g. database unreachable)
   // must not hide the session info that says the server *is* configured
   const [session, list] = await Promise.allSettled([getJSON('/api/session'), getJSON('/api/videos')]);
   if (session.status === 'rejected') {
@@ -55,12 +56,12 @@ async function loadAll() {
     state.error = state.reachable ? message : '';
   } else {
     Object.assign(state, {
-      reachable: true, configured: session.value.youtubeConfigured,
+      reachable: true, configured: session.value.storageConfigured,
       admin: session.value.admin, loginEnabled: session.value.loginEnabled,
     });
     if (list.status === 'fulfilled') {
       Object.assign(store, list.value.videos);
-      state.error = '';
+      state.error = list.value.error || '';
     } else {
       state.error = list.reason.message;
     }
@@ -72,33 +73,37 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-const embedUrl = (id) => `https://www.youtube.com/embed/${encodeURIComponent(id)}?autoplay=1&rel=0`;
+const findVideo = (key, id) => store[key].find((v) => v.id === id);
+const clock = (s) => {
+  if (!(s > 0)) return '';
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = Math.floor(s % 60);
+  return (h ? `${h}:${String(m).padStart(2, '0')}` : m) + ':' + String(sec).padStart(2, '0');
+};
+const sizeText = (b) => (b >= 1024 ** 3 ? (b / 1024 ** 3).toFixed(1) + ' GB' : Math.max(1, Math.round(b / 1024 ** 2)) + ' MB');
+const playerHTML = (v) => `<video src="${escapeHtml(v.url)}" controls autoplay playsinline preload="metadata"
+  ${v.thumbnail ? `poster="${escapeHtml(v.thumbnail)}"` : ''}></video>`;
 
 function cardHTML(v) {
-  const thumb = v.thumbnail || `https://i.ytimg.com/vi/${encodeURIComponent(v.id)}/hqdefault.jpg`;
-  const fallbackSvg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180" viewBox="0 0 320 180"><rect width="320" height="180" fill="%2313131f"/><path d="M140 70l50 20-50 20z" fill="%23ef4444"/><text x="50%" y="80%" dominant-baseline="middle" text-anchor="middle" fill="%2394a3b8" font-family="sans-serif" font-size="12">YouTube Video</text></svg>`;
-  const isPrivate = v.privacy === 'private';
-  const privateBadge = isPrivate
-    ? '<span class="vpriv" title="Private videos can\'t play in embed player — set to Unlisted in YouTube Studio">Private</span>'
-    : '';
-  const studioLink = isPrivate
-    ? `<a href="https://studio.youtube.com/video/${encodeURIComponent(v.id)}/edit" target="_blank" style="display:inline-block;margin-top:4px;font-size:0.75rem;color:#fbbf24;text-decoration:underline;">Set to Unlisted in YouTube Studio ↗</a>`
-    : `<a href="https://www.youtube.com/watch?v=${encodeURIComponent(v.id)}" target="_blank" style="display:inline-block;margin-top:4px;font-size:0.75rem;color:#60a5fa;text-decoration:underline;">Watch on YouTube ↗</a>`;
-
+  // no stored thumbnail (browser couldn't decode it at upload): let the player show a frame
+  const thumb = v.thumbnail
+    ? `<img class="vthumbimg" src="${escapeHtml(v.thumbnail)}" alt="" loading="lazy" />`
+    : `<video class="vthumbimg" src="${escapeHtml(v.url)}#t=1" preload="metadata" muted playsinline></video>`;
+  const date = v.createdAt ? new Date(v.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '';
   return `<div class="vcard">
     <div class="vthumb" data-play="${escapeHtml(v.id)}">
-      <img class="vthumbimg" src="${escapeHtml(thumb)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${fallbackSvg}';" />
-      ${privateBadge}
+      ${thumb}
+      ${v.duration ? `<span class="vdur">${clock(v.duration)}</span>` : ''}
       <div class="vplay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
     </div>
     <div class="vinfo">
       <b>${escapeHtml(v.title)}</b><span>${escapeHtml(v.description)}</span>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;">
-        <button class="venlarge" data-enlarge="${escapeHtml(v.id)}" data-title="${escapeHtml(v.title)}">
-          <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>Enlarge
-        </button>
-        ${studioLink}
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;">
+        <span class="vmeta">${[date, v.size ? sizeText(v.size) : ''].filter(Boolean).join(' · ')}</span>
+        ${state.admin ? `<button class="vdel" data-del="${escapeHtml(v.id)}">Delete</button>` : ''}
       </div>
+      <button class="venlarge" data-enlarge="${escapeHtml(v.id)}">
+        <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>Enlarge
+      </button>
     </div>
   </div>`;
 }
@@ -110,11 +115,11 @@ function emptyHTML(key) {
   else if (!state.reachable) {
     message = 'Videos come from the portal server, which isn\'t running for this page.<br>'
       + '<span class="vempty-hint">Start it with <code>cd server &amp;&amp; npm start</code>, then open the portal from the address it prints.</span>';
-  } else if (state.error || !state.configured) {
-    message = 'YouTube is not connected or token expired.<br>'
-      + '<span class="vempty-hint" style="display:block;margin-top:8px;">'
-      + '<a href="/api/youtube/auth" target="_blank" style="display:inline-block;padding:8px 16px;background:linear-gradient(135deg, #ef4444, #dc2626);color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:0.9rem;">🔑 Click here to Connect YouTube / Google Account</a>'
-      + '</span>';
+  } else if (!state.configured) {
+    message = 'Video storage isn\'t set up yet.<br>'
+      + '<span class="vempty-hint">Add the Neon database and storage keys to <code>server/.env</code>, run <code>npm run setup</code> in <code>server/</code>, then restart the server.</span>';
+  } else if (state.error) {
+    message = `${escapeHtml(state.error)}<br><span class="vempty-hint">Check <code>DATABASE_URL</code> in <code>server/.env</code> and that the Neon project is running.</span>`;
   } else {
     message = `No videos yet in ${PANELS[key].title}.<br><button class="primary" data-add="${key}">+ Add Video</button>`;
   }
@@ -151,13 +156,18 @@ function draw(key) {
   });
   body.querySelectorAll('[data-play]').forEach((thumb) => {
     thumb.addEventListener('click', () => {
-      thumb.innerHTML = `<iframe src="${embedUrl(thumb.dataset.play)}" title="YouTube video"
-        allow="autoplay; encrypted-media; picture-in-picture; fullscreen"></iframe>`;
+      const v = findVideo(key, thumb.dataset.play);
+      if (v) thumb.innerHTML = playerHTML(v);
     }, { once: true });
   });
   body.querySelectorAll('[data-enlarge]').forEach((b) => {
-    b.addEventListener('click', () => openEnlarge(b.dataset.enlarge, b.dataset.title));
+    b.addEventListener('click', () => {
+      body.querySelectorAll('.vthumb video[controls]').forEach((el) => el.pause());
+      const v = findVideo(key, b.dataset.enlarge);
+      if (v) openEnlarge(v);
+    });
   });
+  body.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', () => onDelete(key, b.dataset.del, b)));
 }
 
 function renderPage(key) {
@@ -186,10 +196,23 @@ function openModal(inner, { wide = false, onClose } = {}) {
   return { el, close };
 }
 
-function openEnlarge(id, title) {
-  openModal(`<div class="vmodal-head"><h3>${escapeHtml(title)}</h3><button type="button" class="vmodal-x" data-cancel>✕</button></div>
-    <div class="venframe"><iframe src="${embedUrl(id)}" title="${escapeHtml(title)}"
-      allow="autoplay; encrypted-media; picture-in-picture; fullscreen"></iframe></div>`, { wide: true });
+function openEnlarge(v) {
+  openModal(`<div class="vmodal-head"><h3>${escapeHtml(v.title)}</h3><button type="button" class="vmodal-x" data-cancel>✕</button></div>
+    <div class="venframe">${playerHTML(v)}</div>`, { wide: true });
+}
+
+async function onDelete(key, id, button) {
+  const v = findVideo(key, id);
+  if (!v || !confirm(`Delete "${v.title}"?\n\nThe file is removed from storage and can't be recovered.`)) return;
+  button.disabled = true;
+  try {
+    await getJSON(`/api/videos/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    store[key] = store[key].filter((x) => x.id !== id);
+  } catch (ex) {
+    if (ex.status === 401) state.admin = false;
+    alert(ex.message);
+  }
+  if (isShowing(key)) draw(key);
 }
 
 
@@ -197,7 +220,7 @@ function promptLogin() {
   return new Promise((resolve) => {
     let loggedIn = false;
     const { el, close } = openModal(`<h3>Admin login</h3>
-      <p class="vmodal-note">Uploads are posted to the portal's YouTube channel.</p>
+      <p class="vmodal-note">Only the admin can add or delete videos.</p>
       <form>
         <input type="password" name="password" placeholder="Admin password" autocomplete="current-password" required />
         <div class="vmodal-err" hidden></div>
@@ -234,41 +257,84 @@ function promptLogin() {
 }
 
 async function onAddVideo(key) {
+  if (!(await readyToUpload())) return;
+  openUpload({
+    category: key, heading: 'Add video', note: `Saved to the portal's video storage and shown on “${PANELS[key].title}”.`,
+    onDone: (video) => { store[key].push(video); if (isShowing(key)) draw(key); },
+  });
+}
+
+/* server running, storage set up, uploads enabled, admin logged in? */
+async function readyToUpload() {
   await loadAll();   // fresh check
   if (!state.reachable) {
     alert('The portal server isn\'t running for this page.\n\nStart it with: cd server && npm start');
-    return;
+    return false;
   }
-  if (!state.configured || state.error) {
-    if (confirm('YouTube account connection or refresh token is required.\n\nWould you like to log in to Google now to connect your YouTube channel?')) {
-      window.open('/api/youtube/auth', '_blank');
-    }
-    return;
+  if (!state.configured) {
+    alert('Video storage isn\'t set up yet.\n\nAdd the Neon database and storage keys to server/.env, run "npm run setup" in server/, then restart the server.');
+    return false;
   }
   if (!state.loginEnabled) {
     alert('Uploads are disabled.\n\nSet ADMIN_PASSWORD in server/.env, then restart the server.');
-    return;
+    return false;
   }
-  if (!state.admin && !(await promptLogin())) return;
-  openUpload(key);
+  return state.admin || promptLogin();
 }
 
+/* duration + a JPEG still from ~10% in, read locally before uploading */
+const MIME_BY_EXT = { mp4: 'video/mp4', m4v: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', mkv: 'video/x-matroska', ogv: 'video/ogg' };
+function probeVideo(file) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const v = document.createElement('video');
+    let settled = false;
+    const done = (out) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      URL.revokeObjectURL(url);
+      v.removeAttribute('src');
+      resolve(out);
+    };
+    const timer = setTimeout(() => done({ duration: null, thumb: null }), 15000);
+    v.muted = true;
+    v.playsInline = true;
+    v.preload = 'auto';
+    v.addEventListener('loadedmetadata', () => {
+      v.currentTime = Number.isFinite(v.duration) ? Math.min(2, v.duration * 0.1) : 0;
+    }, { once: true });
+    v.addEventListener('seeked', () => {
+      const duration = Number.isFinite(v.duration) ? v.duration : null;
+      if (!v.videoWidth) return done({ duration, thumb: null });
+      const c = document.createElement('canvas');
+      c.width = 640;
+      c.height = Math.round((640 * v.videoHeight) / v.videoWidth);
+      c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+      c.toBlob((thumb) => done({ duration, thumb }), 'image/jpeg', 0.8);
+    }, { once: true });
+    v.addEventListener('error', () => done({ duration: null, thumb: null }), { once: true });   // a codec this browser can't decode
+    v.src = url;
+  });
+}
 
-function openUpload(key) {
+/* target: { category, siteKey?, title?, heading, note, onDone(video) } */
+function openUpload(target) {
   let xhr = null;
-  const { el, close } = openModal(`<h3>Add video</h3>
-    <p class="vmodal-note">Uploads to YouTube and adds it to the “${PANELS[key].title}” playlist.</p>
+  const { el, close } = openModal(`<h3>${escapeHtml(target.heading)}</h3>
+    <p class="vmodal-note">${escapeHtml(target.note)}</p>
     <form>
-      <input name="title" placeholder="Video title" maxlength="100" required />
+      <input name="title" placeholder="Video title" maxlength="100" required value="${escapeHtml(target.title || '')}" />
       <textarea name="description" placeholder="Description (optional)" rows="3" maxlength="5000"></textarea>
       <input name="video" type="file" accept="video/*" required />
       <div class="vprogress" hidden><div class="vprogress-bar"></div><span class="vprogress-txt"></span></div>
       <div class="vmodal-err" hidden></div>
       <div class="vmodal-actions">
         <button type="button" class="vmodal-cancel" data-cancel>Cancel</button>
-        <button type="submit" class="primary">Upload to YouTube</button>
+        <button type="submit" class="primary">Upload</button>
       </div>
-    </form>`, { onClose: () => xhr?.abort() });
+    </form>`, { onClose: () => { xhr?.abort(); if (!uploaded) target.onCancel?.(); } });
+  let uploaded = false;
 
   const form = el.querySelector('form');
   const err = el.querySelector('.vmodal-err');
@@ -276,6 +342,7 @@ function openUpload(key) {
   const progress = el.querySelector('.vprogress');
   const bar = el.querySelector('.vprogress-bar');
   const txt = el.querySelector('.vprogress-txt');
+  const status = (text, pct) => { txt.textContent = text; if (pct != null) bar.style.width = `${pct}%`; };
 
   const fail = (message) => {
     xhr = null;
@@ -285,48 +352,87 @@ function openUpload(key) {
     submit.disabled = false;
   };
 
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const file = form.elements.video.files[0];
-    if (!file) return;
+  // PUT straight to the bucket through a signed link, with progress
+  const put = (url, file, onProgress) => new Promise((resolve, reject) => {
+    xhr = new XMLHttpRequest();
+    xhr.open('PUT', url);
+    xhr.setRequestHeader('Content-Type', file.type);
+    if (onProgress) xhr.upload.addEventListener('progress', (ev) => { if (ev.lengthComputable) onProgress(ev.loaded / ev.total); });
+    xhr.addEventListener('load', () => (xhr.status >= 200 && xhr.status < 300 ? resolve()
+      : reject(new Error(`Storage refused the upload (HTTP ${xhr.status}). If this keeps happening, run "npm run setup" in server/.`))));
+    // a CORS block looks like a network error to the page
+    xhr.addEventListener('error', () => reject(new Error('Upload failed: couldn\'t reach the video storage. Run "npm run setup" in server/ so the bucket accepts uploads from this address.')));
+    xhr.addEventListener('abort', () => reject(new Error('Upload cancelled.')));
+    xhr.send(file);
+  });
 
-    const data = new FormData();
-    data.append('category', key);
-    data.append('title', form.elements.title.value.trim());
-    data.append('description', form.elements.description.value.trim());
-    data.append('video', file);
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const picked = form.elements.video.files[0];
+    if (!picked) return;
+    // some systems give .mkv/.mov files no MIME type: infer it from the extension
+    const type = picked.type || MIME_BY_EXT[(picked.name.split('.').pop() || '').toLowerCase()] || '';
+    const file = type === picked.type ? picked : new File([picked], picked.name, { type });
 
     submit.disabled = true;
     err.hidden = true;
     progress.hidden = false;
-    bar.style.width = '0%';
-    txt.textContent = 'Uploading… 0%';
-
-    xhr = new XMLHttpRequest();
-    xhr.open('POST', '/api/videos');
-    xhr.upload.addEventListener('progress', (ev) => {
-      if (!ev.lengthComputable) return;
-      const pct = Math.round((ev.loaded / ev.total) * 100);
-      bar.style.width = `${pct}%`;
-      txt.textContent = `Uploading… ${pct}%`;
-    });
-    // browser → server is done; the server is now streaming it to YouTube
-    xhr.upload.addEventListener('load', () => { txt.textContent = 'Sending to YouTube…'; });
-    xhr.addEventListener('load', () => {
-      let body = {};
-      try { body = JSON.parse(xhr.responseText); } catch { /* non-JSON error page */ }
-      if (xhr.status === 201 && body.video) {
-        xhr = null;
-        store[key].push(body.video);
-        close();
-        if (isShowing(key)) draw(key);
-        return;
+    status('Reading video…', 0);
+    try {
+      const { duration, thumb } = await probeVideo(file);
+      status('Preparing upload…', 0);
+      const start = await getJSON('/api/videos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category: target.category, siteKey: target.siteKey, title: form.elements.title.value.trim(),
+          description: form.elements.description.value.trim(),
+          mimeType: file.type, size: file.size,
+        }),
+      });
+      await put(start.uploadUrl, file, (f) => status(`Uploading… ${Math.round(f * 100)}%`, Math.round(f * 100)));
+      let hasThumb = false;
+      if (thumb) {
+        status('Saving thumbnail…', 100);
+        hasThumb = await put(start.thumbUploadUrl, new File([thumb], 'thumb.jpg', { type: 'image/jpeg' })).then(() => true, () => false);
       }
-      if (xhr.status === 401) state.admin = false;
-      fail(body.error || `Upload failed (HTTP ${xhr.status}).`);
-    });
-    xhr.addEventListener('error', () => fail('Upload failed — lost connection to the portal server.'));
-    xhr.send(data);
+      status('Saving to the database…', 100);
+      const { video } = await getJSON(`/api/videos/${encodeURIComponent(start.id)}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ duration, hasThumb }),
+      });
+      xhr = null;
+      uploaded = true;
+      close();
+      target.onDone(video);
+    } catch (ex) {
+      if (ex.status === 401) state.admin = false;
+      if (el.isConnected) fail(ex.message);
+    }
   });
   form.elements.title.focus();
 }
+
+/* ------------------------------------------------- map hazard popups
+   effects.js shows one video per hazard site in its popup's video feed. */
+let siteVideos = null;
+window.portalVideos = {
+  /* { "<hazard>:<lng>,<lat>": video }, cached until a site video changes */
+  siteVideos() {
+    return siteVideos || (siteVideos = getJSON('/api/site-videos').then((r) => r.videos || {}, () => ({})));
+  },
+  playerHTML,
+  /* resolves with the uploaded video, or null if the admin backed out */
+  async uploadSiteVideo(siteKey, title, placeName) {
+    if (!(await readyToUpload())) return null;
+    return new Promise((resolve) => {
+      openUpload({
+        category: 'site', siteKey, title, heading: 'Video for this site',
+        note: `Shown in the video feed of ${placeName}. It replaces this site's current video, if it has one.`,
+        onDone: (video) => { siteVideos = null; resolve(video); },
+        onCancel: () => resolve(null),
+      });
+    });
+  },
+};

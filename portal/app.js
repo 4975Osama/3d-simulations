@@ -407,6 +407,24 @@ SPOTS.forEach(([label, opts]) => {
 
 let last = performance.now();
 let acc = 0, frames = 0;
+// cameraHooks(dt, now) steer the camera (the twin's drone) and return true when
+// they moved it; drawHooks(dt) paint other water overlays (the twin's city ponds)
+const cameraHooks = window.cameraHooks = window.cameraHooks || [];
+const drawHooks = window.waterDrawHooks = window.waterDrawHooks || [];
+let followMap = false, lastDraw = performance.now();
+
+function drawWater() {
+  const now = performance.now(), dt = Math.min(0.1, (now - lastDraw) / 1000);
+  lastDraw = now;
+  for (const fn of drawHooks) fn(dt);
+  // §7: render(dt, mapBearingDegrees, speedMultiplier, projectFn) + pitch for
+  // the grazing-view reflection boost (u_pitch)
+  water.render(dt, map.getBearing(), speed, coarse ? projectCoarse : projectExact, map.getPitch());
+}
+// A camera moved from script is painted by the map on its next frame, so while
+// a hook is steering, the water is drawn inside that same map paint; drawing it
+// here instead would put it one frame ahead of the map and make it swim.
+map.on('render', () => { if (followMap) drawWater(); });
 
 function frame(now) {
   const dt = (now - last) / 1000;
@@ -414,9 +432,10 @@ function frame(now) {
 
   if (spinning) map.setBearing((map.getBearing() + dt * 6) % 360);
 
-  // §7: render(dt, mapBearingDegrees, speedMultiplier, projectFn) + pitch for
-  // the grazing-view reflection boost (u_pitch)
-  water.render(dt, map.getBearing(), speed, coarse ? projectCoarse : projectExact, map.getPitch());
+  let steered = false;
+  for (const fn of cameraHooks) if (fn(dt, now)) steered = true;
+  followMap = steered;
+  if (!steered) drawWater();
 
   acc += dt; frames++;
   if (acc >= 0.5) {

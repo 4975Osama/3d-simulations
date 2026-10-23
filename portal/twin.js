@@ -54,6 +54,21 @@ const RUNOFF_ROOF = 0.9;      // ... fully roofed cell
 const MIN_POND_CELLS = 3;     // smaller wet patches are not drawn as water bodies
 const MAX_PONDS = 220;        // largest ponds handed to the water engine
 const NEAR_DEG = 0.1;         // "threatened" distance (~11 km) from a flood sheet
+const TINT_FADE = 0.04;       // flood tint fades in over this much of the reveal front
+/* critical facilities (portal/public/facilities.json, built by data/build_facilities.py) */
+const FAC_KIND = {                      // OSM kind -> label, colour, shown in the alerts list
+  hospital: ['Hospital', '#f43f5e', true], clinic: ['Clinic', '#fb7185', false], school: ['School', '#facc15', false],
+  college: ['College', '#fbbf24', false], police: ['Police station', '#60a5fa', true], fire: ['Fire station', '#f97316', true],
+  power: ['Power station', '#a78bfa', true],
+};
+const FAC_GROUPS = [
+  { id: 'health', label: 'Hospitals & clinics', color: '#f43f5e', kinds: ['hospital', 'clinic'] },
+  { id: 'edu', label: 'Schools & colleges', color: '#facc15', kinds: ['school', 'college'] },
+  { id: 'emer', label: 'Police & fire', color: '#60a5fa', kinds: ['police', 'fire'] },
+  { id: 'power', label: 'Power stations & grid', color: '#a78bfa', kinds: ['power'] },
+];
+const MAX_FAC_ALERTS = 40;    // facility rows in the alerts list (earliest first)
+const HUD_MS = 120;           // while playing, panel text/chart refresh at most this often
 
 const css = `
 #twinBtn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.6;margin-right:5px}
@@ -96,6 +111,14 @@ const css = `
 #twin .tabs button.on{color:#e6fbff;border-bottom-color:#22d3ee;text-shadow:0 0 10px rgba(34,211,238,.6)}
 #twin .tabs button em{font-style:normal;background:#e11d48;color:#fff;border-radius:99px;padding:0 5px;margin-left:4px;font-size:9px}
 #twin .pane{display:none}#twin .pane.on{display:block}
+#twin .fac{margin-top:10px;border:1px solid rgba(34,211,238,.16);border-radius:9px;background:rgba(2,8,20,.55);padding:7px 9px}
+#twin .fac .fh{display:flex;justify-content:space-between;align-items:baseline;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#5eead4;margin-bottom:4px}
+#twin .fac .fh span{font-size:8.5px;letter-spacing:.04em;text-transform:none;color:#5f7f99}
+#twin .fac .fr{display:flex;align-items:center;gap:7px;padding:3px 0;border-top:1px solid rgba(34,211,238,.07)}
+#twin .fac .fr i{width:8px;height:8px;border-radius:50%;background:var(--c);box-shadow:0 0 6px var(--c);flex:none}
+#twin .fac .fr span{flex:1;color:#9cc3dc}
+#twin .fac .fr b{font:700 11px ui-monospace,Consolas,monospace;color:#e6fbff}
+#twin .fac .fr b.hit{color:#f87171}
 #twin .fix{margin-top:9px;font-size:11px;color:#a5f3fc;line-height:1.45}
 #twin ul{list-style:none;margin:8px 0 0;padding:0;max-height:180px;overflow:auto}
 #twin li{display:flex;gap:6px;padding:5px 0;border-top:1px solid rgba(34,211,238,.1);font-size:11px}
@@ -148,6 +171,17 @@ const css = `
 .tw-beacon .tag span{display:block;font-size:8px;letter-spacing:.14em;color:var(--bc,#22d3ee)}
 .tw-beacon .beam{width:2px;height:46px;background:linear-gradient(180deg,var(--bc,#22d3ee),transparent);box-shadow:0 0 8px var(--bc,#22d3ee)}
 .tw-beacon .base{width:16px;height:16px;border-radius:50%;border:2px solid var(--bc,#22d3ee);margin-top:-8px;animation:twRing 1.8s ease-out infinite}
+#twLoc{position:absolute;left:346px;right:14px;margin:0 auto;width:fit-content;bottom:118px;transform:translateY(10px);z-index:4;pointer-events:none;opacity:0;
+  transition:opacity .45s,transform .6s cubic-bezier(.2,.8,.2,1);text-align:center;min-width:260px;max-width:min(560px,80%);padding:10px 26px 11px;
+  background:linear-gradient(90deg,transparent,rgba(3,9,22,.86) 16%,rgba(3,9,22,.86) 84%,transparent);color:#e6fbff;font:12px ui-sans-serif,Segoe UI,sans-serif}
+#twLoc.show{opacity:1;transform:none}
+@media (max-width:760px){#twLoc{left:14px;bottom:96px}}
+#twLoc .k{font-size:9.5px;letter-spacing:.28em;color:#5eead4;text-transform:uppercase}
+#twLoc .n{font:700 22px/1.2 ui-sans-serif,Segoe UI,sans-serif;letter-spacing:.03em;color:#fff;text-shadow:0 0 14px rgba(34,211,238,.55);margin:3px 0 1px;overflow-wrap:anywhere}
+#twLoc .s{font-size:11px;color:#9cc3dc}
+#twLoc .m{margin-top:6px;padding-top:5px;border-top:1px solid rgba(34,211,238,.25);font:11px ui-monospace,Consolas,monospace;color:#a5f3fc}
+.tw-zone{--bc:#a5f3fc}
+.tw-zone .tag b{font:700 12px ui-sans-serif,Segoe UI,sans-serif;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .marker.twin-warn{background:#b45309!important;color:#fff!important}
 .marker.twin-flood{background:#b91c1c!important;color:#fff!important;box-shadow:0 0 14px #ef4444}
 `;
@@ -186,10 +220,14 @@ function init() {
         <div class="stat"><b id="twArea">0 km²</b><span id="twAreaL">Flooded area</span></div>
         <div class="stat"><b id="twBld">–</b><span id="twBldL">Buildings flooded</span></div>
         <div class="stat"><b id="twDepth">–</b><span id="twDepthL">Average depth</span></div>
-        <div class="stat"><b id="twPop">0</b><span>People exposed</span></div>
+        <div class="stat" title="Residents inside the flooded area · WorldPop 2020 (UN-adjusted, 1 km)"><b id="twPop">0</b><span id="twPopL">People in flooded area</span></div>
         <div class="stat"><b id="twCities">0</b><span>Cities alerted</span></div>
       </div>
       <div class="chartbox"><canvas id="twChart"></canvas></div>
+      <div class="fac" title="OpenStreetMap facilities inside the flood water (in the selected region) / all mapped there">
+        <div class="fh">Critical facilities in water <span id="twFacSrc">OpenStreetMap</span></div>
+        ${FAC_GROUPS.map((g) => `<div class="fr"><i style="--c:${g.color}"></i><span>${g.label}</span><b id="twFac-${g.id}">–</b></div>`).join('')}
+      </div>
       <div class="tabs" id="twTabs">
         <button data-tab="scn" class="on">Scenario</button><button data-tab="ana">Analysis</button><button data-tab="alr">Alerts<em id="twAlertN" hidden>0</em></button>
       </div>
@@ -228,6 +266,9 @@ function init() {
   const scan = document.createElement('div');
   scan.id = 'twinScan';
   wrap.appendChild(scan);
+  const locCard = document.createElement('div');   // "now over" title for the drone's flood zone
+  locCard.id = 'twLoc';
+  wrap.appendChild(locCard);
   function bootMarkup() {
     const steps = ['Satellite basemap', 'SRTM terrain model', 'Flood datasets 2022 · 2026', 'Hydrology engine', 'Water renderer'];
     boot.innerHTML = `<div class="core">
@@ -248,7 +289,8 @@ function init() {
   let prevFlood = false, prevRivers = false, prevTerrain = false, prevYear = '2022';
   let sheets = [], places = [];
   let route = [], camHold = 0;   // drone waypoints + time until which the intro fly owns the camera
-  let droneMoving = false;   // true while droneCamera() moves the map (its moveend must not re-render)
+  let droneMoving = false;   // true while the drone moves the map (its moveend must not re-render)
+  let hudAt = 0;             // last panel text/chart refresh
 
   const rain = () => +$('twInt').value;
   const dur = () => +$('twDur').value;
@@ -273,7 +315,7 @@ function init() {
       const rs = rings(f.geometry);
       let w = 180, s = 90, e = -180, n = -90;
       for (const r of rs) for (const [x, y] of r) { if (x < w) w = x; if (x > e) e = x; if (y < s) s = y; if (y > n) n = y; }
-      return { f, rs, bbox: [w, s, e, n], area: f.properties.area_km2 || 0, r: f.properties.reveal != null ? f.properties.reveal : 0, cx: (w + e) / 2, cy: (s + n) / 2 };
+      return { f, rs, bbox: [w, s, e, n], area: f.properties.area_km2 || 0, pop: f.properties.pop || 0, r: f.properties.reveal != null ? f.properties.reveal : 0, cx: (w + e) / 2, cy: (s + n) / 2 };
     });
     window.fetch('./public/places.geojson').then((r) => r.json()).then((pc) => {
       places = pc.features.filter((f) => f.properties.country === 'Pakistan').map((f) => {
@@ -295,6 +337,16 @@ function init() {
       render();
     });
   }
+  /* residents (WorldPop 2020, 1 km, area-weighted per sheet) under water at grow g */
+  function popAt(g, bbox) {
+    let n = 0;
+    for (const sh of sheets) {
+      if (!inRegion(sh.cx, sh.cy, bbox)) continue;
+      const k = (g - sh.r) / WINDOW;
+      n += sh.pop * (k <= 0 ? 0 : k >= 1 ? 1 : k);
+    }
+    return n;
+  }
   function areaAt(g, bbox) {
     let a = 0;
     for (const sh of sheets) {
@@ -311,13 +363,15 @@ function init() {
   function render() {
     const c = cut(), bbox = REGIONS[$('twRegion').value].bbox;
     const hours = p * totalH(), g = growAt(Math.min(1, hours / dur()), c);   // rivers peak when the storm ends
-    if (active && $('twCam').value === 'drone') droneCamera();
     water.setGrow(g); updateFloodLayers(g);
     const urbanKm2 = updateUrban(p);
     $('twClock').textContent = 'T+' + hhmm(hours) + (hours > dur() ? ' · rain stopped' : '');
     $('twClockBig').textContent = 'T+' + hhmm(hours);
     $('twPhase').textContent = p <= 0 ? 'Standby' : hours < dur() ? `Storm · ${rain()} mm/h` : p >= 1 ? 'Scenario complete' : 'Recession · rain stopped';
     $('twTime').value = Math.round(p * 1000);
+    const now = performance.now();
+    if (playing && now - hudAt < HUD_MS) return;   // water + clock every frame, the rest ~8x/s
+    hudAt = now;
     $('twRain').textContent = fmt(rain() * Math.min(hours, dur())) + ' mm';
     // city mode: the tile shows the simulated street flooding; river sheets are in the fix line
     const city = urbanOn() && hydro.status === 'ready', area = city ? urbanKm2 : areaAt(g, bbox);
@@ -325,24 +379,32 @@ function init() {
     $('twArea').textContent = (area < 10 ? area.toFixed(2) : fmt(area)) + ' km²';
     // alerts: places whose flood/near trigger the clock has passed
     const fired = places.filter((pl) => g >= pl.trig && g > 0 && inRegion(pl.xy[0], pl.xy[1], bbox));
-    const flooded = fired.filter((pl) => pl.level === 'flood');
-    $('twPop').textContent = fmt(flooded.reduce((s, pl) => s + pl.pop, 0));
+    $('twPop').textContent = city ? (hydro.popCell ? fmt(urbanPeople) : popGrid === false ? 'n/a' : 'loading…') : fmt(popAt(g, bbox));
+    $('twPopL').textContent = city ? 'People in flooded streets' : 'People in flooded area';
     $('twCities').textContent = fired.length;
     const sorted = fired.slice().sort((a, b) => a.trig - b.trig);
-    $('twAlerts').innerHTML = sorted.length ? sorted.map((pl) => {
+    const facAlerts = updateFacilities(g, bbox, city ? hydro.cur : null) || [];
+    const rows = sorted.map((pl) => {
       const t = spread(c) > 0 ? (pl.trig / spread(c)) * dur() : 0;
-      return `<li class="${pl.level}"><i>T+${hhmm(t)}</i><b>${pl.level === 'flood' ? 'FLOOD' : 'WARNING'}</b> ${pl.name}</li>`;
-    }).join('') : '<div class="none">No alerts yet</div>';
-    $('twAlertN').hidden = !sorted.length; $('twAlertN').textContent = sorted.length;
+      return { t, html: `<li class="${pl.level}"><i>T+${hhmm(t)}</i><b>${pl.level === 'flood' ? 'FLOOD' : 'WARNING'}</b> ${esc(pl.name)}</li>` };
+    }).concat(facAlerts.slice(0, MAX_FAC_ALERTS).map((a) => ({ t: a.t,
+      html: `<li class="flood"><i>T+${hhmm(a.t)}</i><b>${FAC_KIND[a.kind][0].toUpperCase()}</b> ${esc(a.name || 'unnamed (OSM)')}</li>` })))
+      .sort((a, b) => a.t - b.t);
+    const more = facAlerts.length - MAX_FAC_ALERTS;
+    $('twAlerts').innerHTML = rows.length ? rows.map((x) => x.html).join('') + (more > 0 ? `<div class="none">+ ${fmt(more)} more flooded facilities</div>` : '')
+      : '<div class="none">No alerts yet</div>';
+    const nAlerts = sorted.length + facAlerts.length;
+    $('twAlertN').hidden = !nAlerts; $('twAlertN').textContent = nAlerts;
     document.querySelectorAll('.marker').forEach((el) => {
       const hit = fired.find((pl) => pl.name === el.textContent);
       el.classList.toggle('twin-flood', !!hit && hit.level === 'flood');
       el.classList.toggle('twin-warn', !!hit && hit.level === 'warn');
     });
     const base = areaAt(growAt(1, 0), bbox), fixed = areaAt(growAt(1, c), bbox);
+    const basePop = popAt(growAt(1, 0), bbox), fixedPop = popAt(growAt(1, c), bbox);
     $('twFixOut').textContent = (c > 0
-      ? `River flooding: ${fmt(base)} → ${fmt(fixed)} km² with this fix (saves ${fmt(base - fixed)} km²).`
-      : `River flooding if the storm runs its full course: ${fmt(base)} km².`) + (urbanOn() ? urbanFixText() : '');
+      ? `River flooding: ${fmt(base)} → ${fmt(fixed)} km², ${fmt(basePop)} → ${fmt(fixedPop)} residents with this fix (spares ${fmt(basePop - fixedPop)} people).`
+      : `River flooding if the storm runs its full course: ${fmt(base)} km², ${fmt(basePop)} residents.`) + (urbanOn() ? urbanFixText() : '');
     drawChart(); updateProbe(); updateCoord();
   }
 
@@ -470,6 +532,7 @@ function init() {
           + row('Ground elevation', r.z[k].toFixed(1) + ' m')
           + row('Peak depth', series[pk].toFixed(2) + ' m @ T+' + hhmm(pkH))
           + row('First wet', r.tWet[k] >= 0 ? 'T+' + hhmm(r.tWet[k]) : 'never')
+          + (popGrid ? row('Population density', fmt(densityAt(ll.lng, ll.lat)) + ' /km²') : '')
           + `<svg width="${W}" height="${H}"><path d="${path}L${W},${H}L0,${H}Z" fill="rgba(34,211,238,.18)"/><path d="${path}" fill="none" stroke="#22d3ee" stroke-width="1.5"/>`
           + `<line x1="${(p * W).toFixed(1)}" x2="${(p * W).toFixed(1)}" y1="0" y2="${H}" stroke="#fff" stroke-width="1" opacity=".8"/></svg>`;
       }
@@ -484,6 +547,7 @@ function init() {
     return head + `<div class="big" style="font-size:15px">${!reach ? 'SPARED BY SCENARIO' : fillNow >= 1 ? 'INUNDATED' : fillNow > 0 ? 'FLOODING · ' + Math.round(fillNow * 100) + '%' : 'IN FLOOD PATH'}</div>`
       + row('Flood sheet', hit.f.properties.name || 'Flood extent')
       + row('Sheet area', fmt(hit.area) + ' km²')
+      + row('Residents (WorldPop)', fmt(hit.pop))
       + row('Water arrives', reach ? 'T+' + hhmm(tFlood) : 'not this storm');
   }
   function updateProbe(force) {
@@ -541,14 +605,24 @@ function init() {
         paint: { 'fill-color': ['interpolate', ['linear'], ['coalesce', ['get', 'reveal'], 0], 0, '#0a2f7a', 0.42, '#1b78c8', 0.84, '#5fd4f4'], 'fill-opacity': 0.34 } });
       map.addLayer({ id: 'twin-flood-front', type: 'line', source: 'twin-flood', filter: ['<=', ['get', 'reveal'], 0],
         paint: { 'line-color': '#a5f3fc', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.6, 12, 2.2], 'line-blur': 1.2, 'line-opacity': 0.75 } });
-      lastFilterG = -1;
+      lastFilterG = -1; lastPaintG = -1;
     } catch (err) { /* style mid-swap */ }
   }
+  /* sheets fade in over the last TINT_FADE of the reveal front instead of
+     popping; the filter runs a step ahead so upcoming sheets are already laid out */
+  let lastPaintG = -1;
   function updateFloodLayers(g) {
-    if (!map.getLayer('twin-flood-tint') || Math.abs(g - lastFilterG) < 0.01) return;
-    lastFilterG = g;
-    const f = ['<=', ['get', 'reveal'], g];
-    map.setFilter('twin-flood-tint', f); map.setFilter('twin-flood-front', f);
+    if (!map.getLayer('twin-flood-tint')) return;
+    if (lastFilterG < 0 || g > lastFilterG - 0.01 || g < lastFilterG - 0.06) {
+      lastFilterG = g + 0.05;
+      const f = ['<=', ['get', 'reveal'], lastFilterG];
+      map.setFilter('twin-flood-tint', f); map.setFilter('twin-flood-front', f);
+    }
+    if (Math.abs(g - lastPaintG) < 0.003) return;
+    lastPaintG = g;
+    const fade = (op) => ['interpolate', ['linear'], ['coalesce', ['get', 'reveal'], 0], g - TINT_FADE, op, g, 0];
+    map.setPaintProperty('twin-flood-tint', 'fill-opacity', fade(0.34));
+    map.setPaintProperty('twin-flood-front', 'line-opacity', fade(0.75));
   }
   function removeFloodLayers() {
     try {
@@ -613,6 +687,25 @@ function init() {
     bld: null, bldKey: '', bldSrc: '', bldCell: null, bldState: null, imperv: null,
   };
   let ponds = [];          // [{ cells:Int32Array, max }] — one water-engine polygon each
+  /* WorldPop 2020 1 km density for the city boxes (data/build_population.py) */
+  let popGrid = null, urbanPeople = 0;
+  fetch('./public/pop_grid.json').then((r) => r.json()).then((j) => { popGrid = j.cities; if (active) render(); })
+    .catch((err) => { popGrid = false; console.warn('[twin] population grid:', err.message); });
+  function densityAt(lng, lat) {                       // people per km²
+    for (const g of Object.values(popGrid || {})) {
+      const c = Math.floor((lng - g.west) / g.dx), r = Math.floor((g.north - lat) / g.dy);
+      if (c >= 0 && c < g.w && r >= 0 && r < g.h) return g.density[r * g.w + c];
+    }
+    return 0;
+  }
+  /* residents per model cell for the current domain */
+  function cellPeople() {
+    if (!popGrid || !hydro.res || !hydro.dom) return null;
+    const [w, , e, n] = hydro.dom.bbox, dx = (e - w) / GRID, dy = (n - hydro.dom.bbox[1]) / GRID;
+    const km2 = (hydro.res.cellW * hydro.res.cellH) / 1e6, out = new Float32Array(GRID * GRID);
+    for (let k = 0; k < out.length; k++) out[k] = densityAt(w + ((k % GRID) + 0.5) * dx, n - (Math.floor(k / GRID) + 0.5) * dy) * km2;
+    return out;
+  }
   const fills = new Float32Array(MAX_PONDS), fillTarget = new Float32Array(MAX_PONDS);
 
   function domainAround(c) {
@@ -717,7 +810,7 @@ function init() {
     hydro.res = r; hydro.status = 'ready';
     hydro.cur = new Float32Array(GRID * GRID);
     buildPonds(); buildBeacons();
-    if ($('twCam').value === 'drone') route = buildRoute();
+    if ($('twCam').value === 'drone') setRoute();
     render();
   }
 
@@ -829,7 +922,7 @@ function init() {
   }
 
   /* ---- the second water-engine instance, on its own overlay canvas */
-  let engine = null, engRaf = 0, engLast = 0;
+  let engine = null, engOn = false;
   function cityEngine() {
     if (engine) return engine;
     const canvas = document.createElement('canvas');
@@ -854,11 +947,13 @@ function init() {
     return engine;
   }
   const project = (lon, lat) => map.project([lon, lat]);
-  function engineLoop(ts) {
-    engRaf = 0;
-    if (!engine || !active || !urbanOn() || !ponds.length) { if (engine) engine.canvas.style.display = 'none'; return; }
+  /* drawn by app.js together with the main water (window.waterDrawHooks), so
+     both follow the map's paint while the drone steers and never swim */
+  function engineFrame(dt) {
+    if (!engOn) return;
+    if (!engine || !active || !urbanOn() || !ponds.length) { if (engine) engine.canvas.style.display = 'none'; engOn = false; return; }
     engine.canvas.style.display = '';
-    const dt = Math.min(0.1, ((ts || performance.now()) - (engLast || ts || 0)) / 1000); engLast = ts;
+    dt = Math.min(0.1, dt);
     // follow the main water's palette + look so city and river water match
     if (engine.water.getPalette() !== water.getPalette()) engine.water.setPalette(water.getPalette());
     if (engine.op !== water.getOpacity()) { engine.op = water.getOpacity(); engine.water.setOpacity(engine.op); }
@@ -871,9 +966,8 @@ function init() {
       engine.water.setFills(fills);
     }
     engine.water.render(dt, map.getBearing(), CITY_FLOW_SPEED, project, map.getPitch());
-    engRaf = requestAnimationFrame(engineLoop);
   }
-  const startEngine = () => { if (!engRaf) { engLast = 0; engRaf = requestAnimationFrame(engineLoop); } };
+  const startEngine = () => { engOn = true; };
   function setPondFills(d) {
     for (let i = 0; i < ponds.length; i++) {
       // continuous wet share: a cell counts in proportion to its depth up to 15 cm,
@@ -924,6 +1018,9 @@ function init() {
     const wet = colourBuildings(d), nb = hydro.bldCell ? hydro.bldCell.filter((c) => c >= 0).length : 0;
     let wc0 = 0, sum = 0, mx = 0;
     for (const v of d) if (v >= WET_M) { wc0++; sum += v; if (v > mx) mx = v; }
+    if (!hydro.popCell) hydro.popCell = cellPeople();
+    urbanPeople = 0;                                   // people living where water is deep enough to enter homes
+    if (hydro.popCell) for (let k = 0; k < d.length; k++) if (d[k] >= BLD_WET_M) urbanPeople += hydro.popCell[k];
     $('twBld').textContent = hydro.bld ? fmt(wet) : 'loading…';
     $('twBldL').textContent = hydro.bld ? `Buildings flooded / ${fmt(nb)}` : 'Buildings flooded';
     $('twDepth').textContent = wc0 ? (sum / wc0).toFixed(2) + ' m' : '0 m';
@@ -945,10 +1042,13 @@ function init() {
   function ensureDomain() {
     const c = map.getCenter(), dom = hydro.dom;
     if (dom) {
-      const [w, s, e, n] = dom.bbox, mx = (e - w) * 0.3, my = (n - s) * 0.3;
+      // the drone route lies inside the domain: only re-centre if it truly leaves,
+      // otherwise the ponds would vanish and re-simulate mid-flight
+      const m = $('twCam').value === 'drone' ? 0.06 : 0.3;
+      const [w, s, e, n] = dom.bbox, mx = (e - w) * m, my = (n - s) * m;
       if (c.lng > w + mx && c.lng < e - mx && c.lat > s + my && c.lat < n - my) return;
     }
-    hydro.dom = domainAround(c); hydro.res = null; hydro.status = '';
+    hydro.dom = domainAround(c); hydro.res = null; hydro.status = ''; hydro.popCell = null;
     resetBuildingStates();
     ponds = []; clearBeacons();
     if (engine) engine.water.setPolygons(null);
@@ -1019,7 +1119,93 @@ function init() {
       if (map.getSource('twin-streets')) map.removeSource('twin-streets');
     } catch (err) { /* style mid-swap */ }
   }
-  map.on('style.load', () => { if (active) { addFloodLayers(); addUrbanLayers(); addBuildings(); } });
+  map.on('style.load', () => { if (active) { addFloodLayers(); addUrbanLayers(); addBuildings(); addFacLayers(); } });
+
+  /* ------------------------------------------------- critical facilities
+     12k OpenStreetMap hospitals, clinics, schools, colleges, police and fire
+     stations and power sites. Each knows which flood sheet it sits in (index
+     into the dataset, baked offline); in city mode the street model's depth
+     under it decides. Flooded ones get a red ring and an alert. */
+  let fac = null, facWet = null, facLoad = null;
+  function loadFacilities() {
+    return facLoad || (facLoad = fetch('./public/facilities.json').then((r) => r.json()).then((j) => {
+      fac = j; facWet = new Uint8Array(j.f.length);
+      $('twFacSrc').textContent = `OSM ${j.osm_date}`;
+      if (active) { addFacLayers(); render(); }
+    }).catch((err) => console.warn('[twin] facilities:', err.message)));
+  }
+  function addFacLayers() {
+    if (!fac || map.getSource('twin-fac')) return;
+    try {
+      map.addSource('twin-fac', { type: 'geojson', data: { type: 'FeatureCollection', features: fac.f.map((r, i) => ({
+        type: 'Feature', id: i + 1, properties: { k: fac.kinds[r[2]], n: r[3] }, geometry: { type: 'Point', coordinates: [r[0], r[1]] } })) } });
+      const wet = ['boolean', ['feature-state', 'wet'], false];
+      const colour = ['match', ['get', 'k'], ...Object.entries(FAC_KIND).flatMap(([k, v]) => [k, v[1]]), '#ffffff'];
+      map.addLayer({ id: 'twin-fac', type: 'circle', source: 'twin-fac', minzoom: 6.5,
+        paint: {
+          'circle-color': colour,
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 6.5, ['case', wet, 3.5, 1.6], 12, ['case', wet, 8, 4.5], 16, ['case', wet, 11, 7]],
+          'circle-stroke-color': ['case', wet, '#ef4444', 'rgba(255,255,255,.85)'],
+          'circle-stroke-width': ['case', wet, 2.5, 0.8],
+          'circle-opacity': 0.95,
+        } });
+      facWet.fill(0);                                   // fresh source: no feature-state yet
+    } catch (err) { console.warn('[twin] facility layers:', err.message); }
+  }
+  function removeFacLayers() {
+    try {
+      if (map.getLayer('twin-fac')) map.removeLayer('twin-fac');
+      if (map.getSource('twin-fac')) map.removeSource('twin-fac');
+    } catch (err) { /* style mid-swap */ }
+  }
+  /* hover a facility: its name, type and whether it is in the water (the
+     basemap style has no glyphs, so names live in this popup, not map labels) */
+  const facTip = new window.mapboxgl.Popup({ closeButton: false, closeOnClick: false, offset: 10, className: 'twin-probe' });
+  map.on('mousemove', 'twin-fac', (e) => {
+    const f = e.features && e.features[0];
+    if (!f) return;
+    map.getCanvas().style.cursor = 'pointer';
+    const wet = facWet && facWet[f.id - 1];
+    facTip.setLngLat(f.geometry.coordinates).setHTML(`<h4>${FAC_KIND[f.properties.k][0]}</h4>`
+      + `<div class="big" style="font-size:13px">${esc(f.properties.n || 'Unnamed (OpenStreetMap)')}</div>`
+      + `<div class="row"><span>Status</span><b style="color:${wet ? '#f87171' : '#34d399'}">${wet ? 'IN FLOOD WATER' : 'DRY'}</b></div>`).addTo(map);
+  });
+  map.on('mouseleave', 'twin-fac', () => { map.getCanvas().style.cursor = ''; facTip.remove(); });
+
+  /* flags flooded facilities, returns the alert rows (earliest first) */
+  function updateFacilities(g, bbox, d) {
+    if (!fac) return null;
+    const col = $('twYear').value === '2026' ? 5 : 4, sp = spread(cut());
+    const r = hydro.res, dom = urbanOn() && hydro.status === 'ready' && r && d ? hydro.dom : null;
+    const total = {}, hit = {}, alerts = [];
+    const src = map.getSource('twin-fac');
+    fac.f.forEach((row, i) => {
+      const [x, y, ki, name, s22, s26] = row, kind = fac.kinds[ki], sIdx = col === 5 ? s26 : s22;
+      if (!inRegion(x, y, bbox)) { if (facWet[i] && src) { facWet[i] = 0; map.setFeatureState({ source: 'twin-fac', id: i + 1 }, { wet: false }); } return; }
+      total[kind] = (total[kind] || 0) + 1;
+      let wet = false, at = 0;
+      const sh = sIdx >= 0 ? sheets[sIdx] : null;
+      if (sh && g >= sh.r + WINDOW * 0.5) { wet = true; at = sp > 0 ? ((sh.r + WINDOW * 0.5) / sp) * dur() : 0; }
+      if (!wet && dom) {                                 // inside the street model: depth under the site
+        const [w, s0, e, n] = dom.bbox;
+        if (x >= w && x < e && y > s0 && y <= n) {
+          const k = Math.floor(((n - y) / (n - s0)) * GRID) * GRID + Math.floor(((x - w) / (e - w)) * GRID);
+          if (d[k] >= BLD_WET_M) { wet = true; at = Math.max(0, r.tWet[k]); }
+        }
+      }
+      if (wet) {
+        hit[kind] = (hit[kind] || 0) + 1;
+        if (FAC_KIND[kind][2]) alerts.push({ t: at, kind, name });
+      }
+      if (src && facWet[i] !== +wet) { facWet[i] = +wet; map.setFeatureState({ source: 'twin-fac', id: i + 1 }, { wet }); }
+    });
+    for (const gr of FAC_GROUPS) {
+      const h = gr.kinds.reduce((a, k) => a + (hit[k] || 0), 0), t = gr.kinds.reduce((a, k) => a + (total[k] || 0), 0);
+      const el = $('twFac-' + gr.id);
+      el.textContent = `${fmt(h)} / ${fmt(t)}`; el.classList.toggle('hit', h > 0);
+    }
+    return alerts.sort((a, b) => a.t - b.t);
+  }
 
   /* ------------------------------------------------------- drone route */
   const bearingTo = (a, b) => (Math.atan2(b[0] - a[0], b[1] - a[1]) * 180 / Math.PI + 360) % 360;
@@ -1049,7 +1235,8 @@ function init() {
     }
     if (picks.length < 2) return orbit(hydro.dom.center, 0.008);
     picks.sort((a, b) => tWet[a] - tWet[b]);
-    return withBearings(picks.map((k) => ({ xy: [w + ((k % GRID) + 0.5) * dx, n - (Math.floor(k / GRID) + 0.5) * dy], r: tWet[k] })));
+    return withBearings(picks.map((k) => ({ xy: [w + ((k % GRID) + 0.5) * dx, n - (Math.floor(k / GRID) + 0.5) * dy], r: tWet[k],
+      zone: { depth: maxD[k], wetH: tWet[k] } })));
   }
   function buildRoute() {
     if (isCity()) return cityRoute();
@@ -1058,49 +1245,241 @@ function init() {
       .sort((a, b) => b.area - a.area).slice(0, 60).sort((a, b) => a.r - b.r);
     const pts = [];
     for (const sh of pool) {
-      if (pts.every((q) => Math.hypot(q.xy[0] - sh.cx, q.xy[1] - sh.cy) > (bbox ? 0.15 : 0.9))) pts.push({ xy: [sh.cx, sh.cy], r: sh.r });
+      if (pts.every((q) => Math.hypot(q.xy[0] - sh.cx, q.xy[1] - sh.cy) > (bbox ? 0.15 : 0.9))) pts.push({ xy: [sh.cx, sh.cy], r: sh.r, zone: { area: sh.area, pop: sh.pop, river: sh.f.properties.river } });
       if (pts.length >= 8) break;
     }
     if (pts.length < 2) return orbit(REGIONS[$('twRegion').value].cam.center, 0.3);   // no flood to follow
     return withBearings(pts);
   }
-  /* fly the drone to where timeline position p sits along the route */
-  function droneCamera() {
-    if (!route.length || performance.now() < camHold) return;
-    const f = Math.min(0.9999, Math.max(0, p)) * (route.length - 1), i = Math.floor(f), t = f - i;
-    const a = route[i], b = route[i + 1] || a, e = t * t * (3 - 2 * t);
+  /* ---- flight path: a centripetal Catmull-Rom spline through the waypoints
+     (no overshoot or loops at sharp corners), resampled by arc length so the
+     drone flies at an even ground speed instead of stopping at every point. */
+  let path = null;       // { pts: [[lng, lat]], cum: [ground length], len, kx }
+  let cam = null;        // smoothed drone state, eased toward the path every frame
+  function buildPath(wps) {
+    const P = wps.map((w) => w.xy);
+    if (P.length === 1) P.push([P[0][0] + 1e-4, P[0][1]]);
+    const kx = Math.cos((P[0][1] * Math.PI) / 180);       // lng degrees -> lat-degree units
+    const n = P.length, mirror = (a, b) => [2 * b[0] - a[0], 2 * b[1] - a[1]];
+    const C = [mirror(P[1], P[0]), ...P, mirror(P[n - 2], P[n - 1])];
+    const knot = (a, b) => Math.max(1e-9, Math.sqrt(Math.hypot((b[0] - a[0]) * kx, b[1] - a[1])));
+    const mix = (a, b, ta, tb, u) => { const w = (u - ta) / (tb - ta); return [a[0] + (b[0] - a[0]) * w, a[1] + (b[1] - a[1]) * w]; };
+    const pts = [];
+    for (let k = 0; k < n - 1; k++) {
+      const [p0, p1, p2, p3] = [C[k], C[k + 1], C[k + 2], C[k + 3]];
+      const t1 = knot(p0, p1), t2 = t1 + knot(p1, p2), t3 = t2 + knot(p2, p3);
+      for (let q = 0; q < 48; q++) {                     // Barry-Goldman evaluation
+        const u = t1 + ((t2 - t1) * q) / 48;
+        const a1 = mix(p0, p1, 0, t1, u), a2 = mix(p1, p2, t1, t2, u), a3 = mix(p2, p3, t2, t3, u);
+        pts.push(mix(mix(a1, a2, 0, t2, u), mix(a2, a3, t1, t3, u), t1, t2, u));
+      }
+    }
+    pts.push(P[n - 1]);
+    const cum = [0];
+    for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot((pts[k][0] - pts[k - 1][0]) * kx, pts[k][1] - pts[k - 1][1]));
+    const len = cum[cum.length - 1] || 1e-9;
+    return { pts, cum, len, kx, wpS: wps.map((_, k) => cum[Math.min(k * 48, cum.length - 1)] / len) };   // waypoint k's s
+  }
+  function pathAt(s) {                                   // s = 0..1 of the ground length
+    const { pts, cum, len } = path, d = Math.min(1, Math.max(0, s)) * len;
+    let lo = 0, hi = cum.length - 1;
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (cum[mid] <= d) lo = mid; else hi = mid; }
+    const t = cum[hi] > cum[lo] ? (d - cum[lo]) / (cum[hi] - cum[lo]) : 0;
+    return [pts[lo][0] + (pts[hi][0] - pts[lo][0]) * t, pts[lo][1] + (pts[hi][1] - pts[lo][1]) * t];
+  }
+  const headingAt = (a, b) => (Math.atan2((b[0] - a[0]) * path.kx, b[1] - a[1]) * 180 / Math.PI + 360) % 360;
+  const angDiff = (a, b) => ((((b - a) % 360) + 540) % 360) - 180;
+  const viewDeg = (z) => 720 / 2 ** z;                  // rough ground width on screen, in degrees
+  function setRoute() { route = buildRoute(); path = buildPath(route); nameZones(route); zoneIdx = -2; }
+
+  /* ---- naming the flood zones the drone passes. Mapbox reverse geocoding
+     (same token as the basemap) gives the town / neighbourhood; until it
+     answers, or if it can't, the nearest town and province from local data. */
+  const PROVINCE = { 'Sind': 'Sindh', 'Baluchistan': 'Balochistan', 'K.P.': 'Khyber Pakhtunkhwa', 'F.A.T.A.': 'Khyber Pakhtunkhwa',
+    'Northern Areas': 'Gilgit-Baltistan', 'F.C.T.': 'Islamabad Capital Territory' };
+  const zoneNames = new Map();          // "lng,lat" -> { name, sub } from the geocoder (null while in flight)
+  let towns = [], provinces = [], localLoad = null;
+  const zoneKey = (xy) => xy[0].toFixed(3) + ',' + xy[1].toFixed(3);
+  function loadLocalNames() {
+    return localLoad || (localLoad = Promise.all(['places', 'provinces'].map((f) => fetch(`./public/${f}.geojson`).then((r) => r.json())))
+      .then(([pl, pv]) => {
+        towns = pl.features.filter((f) => f.properties.country === 'Pakistan').map((f) => ({ name: f.properties.name, xy: f.geometry.coordinates }));
+        provinces = pv.features.map((f) => ({ name: PROVINCE[f.properties.name] || f.properties.name, rs: rings(f.geometry) }));
+      }).catch(() => {}));
+  }
+  function localName(xy) {
+    const prov = provinces.find((pv) => pv.rs.some((r) => inside(r, xy[0], xy[1])));
+    let best = null, bd = Infinity;
+    for (const t of towns) {
+      const d = Math.hypot((t.xy[0] - xy[0]) * Math.cos((xy[1] * Math.PI) / 180), t.xy[1] - xy[1]) * 111;
+      if (d < bd) { bd = d; best = t; }
+    }
+    const dir = best && ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(bearingTo(best.xy, xy) / 45) % 8];
+    return { name: !best ? 'Flood zone' : bd < 6 ? best.name : `${bd < 20 ? bd.toFixed(1) : Math.round(bd)} km ${dir} of ${best.name}`,
+      sub: (prov ? prov.name + ', ' : '') + 'Pakistan' };
+  }
+  async function geocode(xy, city) {
+    const types = city ? ['neighborhood', 'locality', 'place'] : ['place', 'locality', 'district'];
+    const url = `https://api.mapbox.com/search/geocode/v6/reverse?longitude=${xy[0].toFixed(5)}&latitude=${xy[1].toFixed(5)}`
+      + `&types=${types.join(',')}&language=en&access_token=${window.mapboxgl.accessToken}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('geocoder ' + res.status);
+    const f = ((await res.json()).features || [])
+      .sort((a, b) => types.indexOf(a.properties.feature_type) - types.indexOf(b.properties.feature_type))[0];
+    return f && { name: f.properties.name, sub: f.properties.place_formatted || '' };
+  }
+  function nameZones(wps) {
+    loadLocalNames().then(() => { zoneIdx = -2; });     // repaint the card once the fallback is usable
+    const city = isCity();
+    for (const wp of wps) {
+      if (!wp.zone) continue;
+      const k = zoneKey(wp.xy);
+      if (zoneNames.has(k)) continue;
+      zoneNames.set(k, null);
+      geocode(wp.xy, city).then((nm) => { if (nm) { zoneNames.set(k, nm); zoneIdx = -2; } })
+        .catch((err) => console.warn('[twin] zone name:', err.message));
+    }
+  }
+  const zoneLabel = (wp) => zoneNames.get(zoneKey(wp.xy)) || localName(wp.xy);
+  const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+  /* the "now over" card + a pin on the ground for the zone under the drone */
+  let zoneIdx = -1, zoneHTML = '', zoneMarker = null, zoneSwap = 0;
+  function zoneInfo(i, km) {
+    const wp = route[i], z = wp.zone, nm = zoneLabel(wp), n = route.filter((q) => q.zone).length, hours = p * totalH();
+    let line;
+    if (z.area != null) {
+      const at = spread(cut()) > 0 ? (wp.r / spread(cut())) * dur() : 0;
+      line = `≈${fmt(z.area)} km² · ${fmt(z.pop)} residents · ` + (hours >= at ? `under water since T+${hhmm(at)}` : `water arrives T+${hhmm(at)}`)
+        + (z.river ? ` · ${z.river[0].toUpperCase() + z.river.slice(1)} river` : '');
+    } else {
+      line = `peak depth ${z.depth.toFixed(1)} m · ` + (hours >= z.wetH ? `flooding since T+${hhmm(z.wetH)}` : `floods at T+${hhmm(z.wetH)}`);
+    }
+    const what = z.area != null ? 'flood zone' : 'street flooding', k = route.slice(0, i + 1).filter((q) => q.zone).length;
+    const kick = km == null ? `Now over · ${what} ${k} / ${n}` : `Heading to · ${what} ${k} / ${n} · ${km < 10 ? km.toFixed(1) : Math.round(km)} km ahead`;
+    return { nm, html: `<div class="k">${kick}</div><div class="n">${esc(nm.name)}</div><div class="s">${esc(nm.sub)}</div><div class="m">${line}</div>` };
+  }
+  function showZone(i, km) {
+    if (i < 0) {
+      if (zoneIdx !== -1) {
+        zoneIdx = -1; zoneHTML = ''; clearTimeout(zoneSwap);
+        locCard.classList.remove('show');
+        if (zoneMarker) { zoneMarker.remove(); zoneMarker = null; }
+      }
+      return;
+    }
+    const { nm, html } = zoneInfo(i, km);
+    if (i === zoneIdx && html === zoneHTML) return;
+    const fadeOld = zoneIdx >= 0 && i !== zoneIdx && locCard.classList.contains('show');
+    zoneIdx = i; zoneHTML = html;
+    const apply = () => {
+      locCard.innerHTML = html; locCard.classList.add('show');
+      if (!zoneMarker) {
+        const el = document.createElement('div');
+        el.className = 'tw-beacon tw-zone';
+        el.innerHTML = '<div class="tag"><span></span><b></b></div><div class="beam"></div><div class="base"></div>';
+        zoneMarker = new window.mapboxgl.Marker({ element: el, anchor: 'bottom' });
+      }
+      zoneMarker.getElement().querySelector('span').textContent = km == null ? 'NOW OVER' : 'NEXT ZONE';
+      zoneMarker.getElement().querySelector('b').textContent = nm.name;
+      zoneMarker.setLngLat(route[i].xy).addTo(map);
+    };
+    clearTimeout(zoneSwap);
+    if (fadeOld) { locCard.classList.remove('show'); zoneSwap = setTimeout(apply, 450); }   // old title out, new one in
+    else apply();
+  }
+  /* zone under the drone: the nearest named waypoint within ~half a screen;
+     in transit, the next one along the route and how far ahead it is */
+  function updateZone(zoom) {
+    let best = -1, bd = 0.5 * viewDeg(zoom);
+    route.forEach((wp, i) => {
+      if (!wp.zone) return;
+      const d = Math.hypot((wp.xy[0] - cam.x) * path.kx, wp.xy[1] - cam.y);
+      if (d < bd) { bd = d; best = i; }
+    });
+    if (best >= 0) { showZone(best); return; }
+    const next = route.findIndex((wp, i) => wp.zone && path.wpS[i] > cam.s);
+    if (next < 0) { showZone(-1); return; }
+    const km = Math.hypot((route[next].xy[0] - cam.x) * path.kx, route[next].xy[1] - cam.y) * 111;
+    showZone(next, km < 10 ? Math.round(km * 10) / 10 : Math.round(km));
+  }
+
+  /* where the drone should be for timeline position s: on the path, nose
+     pointed down the path ahead, climbing a little and tilting up in turns */
+  function droneTarget(s, zoom) {
+    const ahead = Math.min(0.3, (0.35 * viewDeg(zoom)) / path.len);
+    const here = pathAt(s), back = pathAt(s - ahead * 0.3), front = pathAt(s + ahead), far = pathAt(s + ahead * 2);
+    const bearing = headingAt(back, front);
+    const turn = Math.min(1, Math.abs(angDiff(bearing, headingAt(front, far))) / 90);
+    return { xy: here, bearing, zoom: zoom - 0.45 * turn, pitch: 66 - 6 * turn };
+  }
+
+  /* runs every display frame from app.js's loop (window.cameraHooks):
+     the drone eases (critically damped) toward its target, so playback,
+     scrubbing, route changes and the zoom slider all glide rather than jump */
+  function droneFrame(dt, now) {
+    if (!active || !path || $('twCam').value !== 'drone' || now < camHold) { showZone(-1); return; }
+    dt = Math.min(0.1, dt);
+    const ease = (tau) => 1 - Math.exp(-dt / tau);
+    const zoomSet = +$('twZoom').value, sGoal = Math.min(1, Math.max(0, p));
+    if (!cam) {                                          // take over from the intro fly smoothly
+      const c = map.getCenter();
+      cam = { s: sGoal, x: c.lng, y: c.lat, b: map.getBearing(), z: map.getZoom(), pt: map.getPitch() };
+    }
+    cam.s += (sGoal - cam.s) * ease(0.5);
+    const tg = droneTarget(cam.s, zoomSet);
+    // a long hop (scrub / new route) climbs for the transit, like flyTo, then descends
+    const gap = Math.hypot((tg.xy[0] - cam.x) * path.kx, tg.xy[1] - cam.y) + Math.abs(sGoal - cam.s) * path.len;
+    tg.zoom -= Math.min(2.5, Math.log2(1 + gap / viewDeg(zoomSet)));
+    cam.x += (tg.xy[0] - cam.x) * ease(0.25);
+    cam.y += (tg.xy[1] - cam.y) * ease(0.25);
+    cam.b += angDiff(cam.b, tg.bearing) * ease(0.9);
+    cam.z += (tg.zoom - cam.z) * ease(0.7);
+    cam.pt += (tg.pitch - cam.pt) * ease(0.9);
+    // hover sway: slow, small, out of phase, so the shot feels held in the air
+    const t = now / 1000;
     droneMoving = true;
     map.jumpTo({
-      center: [a.xy[0] + (b.xy[0] - a.xy[0]) * e, a.xy[1] + (b.xy[1] - a.xy[1]) * e],
-      zoom: +$('twZoom').value, pitch: 68, bearing: lerpAngle(a.bearing, b.bearing, e),
+      center: [cam.x, cam.y],
+      zoom: cam.z + 0.03 * Math.sin(t * 0.29),
+      pitch: Math.min(80, Math.max(0, cam.pt + 1.2 * Math.sin(t * 0.37))),
+      bearing: cam.b + 0.9 * Math.sin(t * 0.23) + 0.4 * Math.sin(t * 0.61 + 1),
     });
     droneMoving = false;
+    updateZone(cam.z);
+    return true;               // app.js then draws the water in the map's own paint of this camera
   }
+  (window.cameraHooks = window.cameraHooks || []).push(droneFrame);
+  (window.waterDrawHooks = window.waterDrawHooks || []).push((dt) => engineFrame(dt));
+
   function setCamMode() {
     const drone = $('twCam').value === 'drone';
+    cam = null;
     if (drone && active) {
-      route = buildRoute();
-      camHold = performance.now() + 1700;
-      const a = route[Math.min(route.length - 1, Math.floor(p * (route.length - 1)))];
-      map.flyTo({ center: a.xy, zoom: +$('twZoom').value, pitch: 68, bearing: a.bearing, duration: 1600, essential: true });
+      setRoute();
+      camHold = performance.now() + 2300;
+      const tg = droneTarget(Math.min(1, Math.max(0, p)), +$('twZoom').value);
+      map.flyTo({ center: tg.xy, zoom: tg.zoom, pitch: tg.pitch, bearing: tg.bearing, duration: 2200, curve: 1.6, essential: true });
     } else if (active) fly();
   }
 
   /* ---------------------------------------------------------- playback */
   function tick(ts) {
     if (!playing) return;
-    const dt = Math.min(0.1, (ts - lastTs) / 1000); lastTs = ts;
+    const dt = Math.min(0.1, Math.max(0, (ts - lastTs) / 1000)); lastTs = ts;   // the first frame can predate play
     p = Math.min(1, p + (dt * +$('twSpeed').value) / PLAY_SECONDS);
     if (p * totalH() < dur()) startRain(); else stopRain();
     render();
     if (p >= 1) setPlaying(false); else raf = requestAnimationFrame(tick);
   }
   function setPlaying(on) {
+    const wasPlaying = playing;
     playing = on;
     $('twPlay').textContent = on ? '❚❚ Pause' : (p >= 1 ? '↻ Replay' : '▶ Play');
     cancelAnimationFrame(raf);
     if (on && active) startRain(); else stopRain();
     if (on) { if (p >= 1) p = 0; lastTs = performance.now(); raf = requestAnimationFrame(tick); }
+    else if (wasPlaying && active) render();   // the panel was throttled during playback: bring it up to date
   }
 
   function fly() { map.flyTo({ ...REGIONS[$('twRegion').value].cam, duration: 2600, essential: true }); }
@@ -1125,7 +1504,7 @@ function init() {
     if (!prevTerrain) $('terrain3d').click();
     prepare();
     p = 0; setPlaying(false);
-    addFloodLayers(); addUrbanLayers(); addBuildings();
+    addFloodLayers(); addUrbanLayers(); addBuildings(); addFacLayers(); loadFacilities();
     panel.classList.add('show');
     render();
     setTimeout(() => {
@@ -1140,7 +1519,7 @@ function init() {
     panel.classList.remove('show');
     document.querySelectorAll('.marker').forEach((el) => el.classList.remove('twin-flood', 'twin-warn'));
     water.setGrow(1);
-    removeBuildings(); removeFloodLayers(); removeUrbanLayers(); stopRain(); clearProbe(); clearBeacons();
+    removeBuildings(); removeFloodLayers(); removeUrbanLayers(); removeFacLayers(); stopRain(); clearProbe(); clearBeacons();
     window.setFloodDataset(prevYear);
     setToggle('floodToggle', prevFlood); setToggle('chkRivers', prevRivers);
     if (!prevTerrain && $('terrain3d').classList.contains('on')) $('terrain3d').click();
@@ -1153,15 +1532,15 @@ function init() {
   $('twTime').addEventListener('input', (e) => { setPlaying(false); p = +e.target.value / 1000; render(); });
   $('twInt').addEventListener('input', () => { $('twIntV').textContent = rain() + ' mm/h'; if (urbanOn()) runSim(); reroute(); render(); });
   $('twDur').addEventListener('input', () => { $('twDurV').textContent = dur() + ' h'; if (urbanOn()) runSim(); reroute(); render(); });
-  function reroute() { if (active && $('twCam').value === 'drone') { route = buildRoute(); } }
+  function reroute() { if (active && $('twCam').value === 'drone') setRoute(); }
   $('twFix').addEventListener('change', () => { if (urbanOn()) runSim(); reroute(); render(); });
   $('twRegion').addEventListener('change', () => {
     if (isCity() && +$('twZoom').value < 14.5) { $('twZoom').value = 14.5; $('twZoomV').textContent = '14.5'; }   // street level for the urban model
     render(); setCamMode();
   });
   $('twCam').addEventListener('change', setCamMode);
-  $('twZoom').addEventListener('input', () => { $('twZoomV').textContent = $('twZoom').value; if ($('twCam').value === 'drone') droneCamera(); });
+  $('twZoom').addEventListener('input', () => { $('twZoomV').textContent = $('twZoom').value; });   // the drone eases to it
   /* grabbing the map hands the camera back to the user */
   map.on('dragstart', (e) => { if (active && e.originalEvent && $('twCam').value === 'drone') { $('twCam').value = 'overview'; } });
-  $('twYear').addEventListener('change', () => { window.setFloodDataset($('twYear').value); prepare(); addFloodLayers(); lastFilterG = -1; reroute(); render(); });
+  $('twYear').addEventListener('change', () => { window.setFloodDataset($('twYear').value); prepare(); addFloodLayers(); lastFilterG = -1; lastPaintG = -1; reroute(); render(); });
 }

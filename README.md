@@ -25,22 +25,26 @@ python3 -m http.server 8080 --bind 0.0.0.0 --directory .    # from the repo root
 # open http://localhost:8080/demo/index.html
 ```
 
-### The portal (with YouTube video uploads)
+### The portal (with video storage)
 
-`portal/` needs the small server in `server/`: it serves the portal and uploads the
-Simex Videos / Hazard Calendars / General Videos pages to your YouTube channel, one
-playlist per page. Google credentials live only in `server/.env`, never in the browser.
+`portal/` needs the small server in `server/`: it serves the portal and manages the
+videos on the Simex Videos / Hazard Calendars / General Videos / Simulations pages.
+Video files go to a **Neon Object Storage** bucket and their details (title, category,
+size, duration, thumbnail) to a **Neon** Postgres table. The browser uploads straight
+to the bucket through short-lived signed links, so big files never pass through the server.
+All keys live only in `server/.env`, never in the browser.
 
 ```bash
 cd server
 cp .env.example .env     # then fill it in — see the comments in that file
 npm install
+npm run setup            # once: creates the table + bucket and lets the portal's address use it
 npm start                # open http://localhost:8080/portal/
 ```
 
-A plain static server still runs the map, but the video pages will say the portal
-server isn't running. The refresh token needs the full `youtube` scope, and YouTube
-keeps API uploads private until your Cloud project passes its API audit.
+Re-run `npm run setup` after adding a new address to `PORTAL_ORIGINS` (for example
+the deployed site). A plain static server still runs the map, but the video pages
+will say the portal server isn't running.
 
 ---
 

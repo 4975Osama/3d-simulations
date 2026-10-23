@@ -3,3 +3,7 @@ node_modules/
 
 .vercel
 .env*
+
+# downloaded source data (rebuild with data/build_*.py)
+data/raw/
+__pycache__/
