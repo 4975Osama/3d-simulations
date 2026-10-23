@@ -1,0 +1,8 @@
+# Vercel serves only the static portal: upload just what the site needs.
+# (Keeps server/.env, data/ and everything else off the public deployment.)
+/*
+!/portal
+!/waterSurface.js
+!/bg video.mp4
+!/vercel.json
+.env*
