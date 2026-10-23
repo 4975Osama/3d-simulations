@@ -1,8 +1,15 @@
-# Vercel serves only the static portal: upload just what the site needs.
-# (Keeps server/.env, data/ and everything else off the public deployment.)
+# Upload only what the live site needs: the static portal plus the /api
+# function and the server code it runs. Secrets (.env), local caches and
+# data/ stay off Vercel; its env vars hold the keys instead.
 /*
 !/portal
 !/waterSurface.js
 !/bg video.mp4
 !/vercel.json
+!/api
+!/server
+!/package.json
+!/package-lock.json
+/server/node_modules
+/server/cache
 .env*
