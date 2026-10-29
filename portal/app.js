@@ -297,19 +297,68 @@ $('tilt').addEventListener('click', (e) => {
   map.easeTo({ pitch: on ? 60 : 0, duration: 900 });
   e.target.classList.toggle('on', on);
 });
+/* ------------------------------------------------------------- 3D elevation
+   Mapbox Terrain-DEM (512 px tiles, ~30 m detail down to zoom 14) for the 3D
+   surface, a hillshade from the same elevation data so slopes are lit and
+   shadowed, and an exaggeration that eases off as you zoom in: mountains still
+   read as mountains at country scale, and look true to life at street level.
+   The terrarium DEM (AWS open data) is the fallback if Mapbox tiles fail. */
+const EXAGGERATION = ['interpolate', ['linear'], ['zoom'], 4, 2.2, 8, 1.7, 11, 1.35, 14, 1.15];
+const RELIEF = {                        // hillshade strength per basemap: satellite already has light baked in
+  satellite: { exaggeration: 0.22, shadow: 'rgba(20,24,30,0.55)', highlight: 'rgba(255,248,235,0.25)' },
+  terrain: { exaggeration: 0.5, shadow: '#5d5546', highlight: '#fffaf0' },
+  dark: { exaggeration: 0.55, shadow: '#000000', highlight: '#3a4a60' },
+  streets: { exaggeration: 0.35, shadow: '#77705f', highlight: '#ffffff' },
+};
+let demFallback = false;
+function demSpec() {
+  return demFallback
+    ? { type: 'raster-dem', encoding: 'terrarium', tileSize: 256, maxzoom: 13,
+        tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'] }
+    : { type: 'raster-dem', url: 'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize: 512, maxzoom: 14 };
+}
+function setRelief(on) {
+  if (!map.getStyle()) return;
+  if (!on) { if (map.getLayer('hillshade')) map.removeLayer('hillshade'); return; }
+  // hillshade gets its own copy of the source: sharing one with the 3D terrain costs quality
+  if (!map.getSource('dem-shade')) map.addSource('dem-shade', demSpec());
+  const r = RELIEF[styleName] || RELIEF.terrain;
+  const paint = {
+    'hillshade-exaggeration': r.exaggeration, 'hillshade-shadow-color': r.shadow,
+    'hillshade-highlight-color': r.highlight, 'hillshade-accent-color': r.shadow,
+    'hillshade-illumination-direction': 315, 'hillshade-illumination-anchor': 'map',
+  };
+  if (map.getLayer('hillshade')) { Object.entries(paint).forEach(([k, v]) => map.setPaintProperty('hillshade', k, v)); return; }
+  // just above the basemap imagery, under rivers, borders and everything else
+  const before = ['river-hint', 'prov', 'border', 'city'].find((id) => map.getLayer(id));
+  map.addLayer({ id: 'hillshade', type: 'hillshade', source: 'dem-shade', paint }, before);
+}
+function enableTerrain() {
+  if (!map.getSource('dem')) map.addSource('dem', demSpec());
+  map.setTerrain({ source: 'dem', exaggeration: EXAGGERATION });
+  setRelief(true);
+}
+// no Mapbox elevation (token restricted, offline...): switch to the open DEM once
+map.on('error', (e) => {
+  const id = e.sourceId || (e.source && e.source.id);
+  if (demFallback || (id !== 'dem' && id !== 'dem-shade')) return;
+  console.warn('[terrain] Mapbox DEM unavailable, using the terrarium DEM:', e.error && e.error.message);
+  demFallback = true;
+  const on = $('terrain3d').classList.contains('on');
+  map.setTerrain(null);
+  if (map.getLayer('hillshade')) map.removeLayer('hillshade');
+  ['dem', 'dem-shade'].forEach((sid) => { if (map.getSource(sid)) map.removeSource(sid); });
+  if (on) enableTerrain();
+});
+
 $('terrain3d').addEventListener('click', (e) => {
   const on = !e.target.classList.contains('on');
   if (on) {
-    if (!map.getSource('dem')) {
-      map.addSource('dem', {
-        type: 'raster-dem', encoding: 'terrarium', tileSize: 256, maxzoom: 13,
-        tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
-      });
-    }
-    map.setTerrain({ source: 'dem', exaggeration: 1.6 });
+    enableTerrain();
     if (map.getPitch() < 30) map.easeTo({ pitch: 62, duration: 900 });
   } else {
     map.setTerrain(null);
+    setRelief(false);
   }
   e.target.classList.toggle('on', on);
 });
@@ -375,7 +424,7 @@ $('styles').addEventListener('click', (e) => {
   const terrainOn = $('terrain3d').classList.contains('on');
   map.setStyle(buildStyle(styleName, data));
   map.once('styledata', () => {
-    if (terrainOn && map.getSource('dem')) map.setTerrain({ source: 'dem', exaggeration: 1.6 });
+    if (terrainOn) enableTerrain();
     water.invalidateProjection();
   });
   water.setPalette(styleName);            // swap u_deep/u_shallow/u_foam/u_op/u_glint
@@ -456,13 +505,7 @@ map.once('load', () => {
   const boot = $('boot');   // may already be gone: the 4 s fallback below removes it on slow loads
   if (boot) { boot.style.opacity = '0'; setTimeout(() => boot.remove(), 600); }
   // portal boots in 3D: satellite + terrain + gentle oblique camera
-  if (!map.getSource('dem')) {
-    map.addSource('dem', {
-      type: 'raster-dem', encoding: 'terrarium', tileSize: 256, maxzoom: 13,
-      tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
-    });
-  }
-  if ($('terrain3d').classList.contains('on')) map.setTerrain({ source: 'dem', exaggeration: 1.6 });
+  if ($('terrain3d').classList.contains('on')) enableTerrain();
 });
 setTimeout(() => { const b = $('boot'); if (b) { b.style.opacity = '0'; setTimeout(() => b.remove(), 600); } }, 4000);
 

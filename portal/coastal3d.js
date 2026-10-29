@@ -19,8 +19,13 @@ const SEVERITY = {                 // cyclone radius (m), rain share
   Medium: { R: 55000, k: 0.65 },
   Low: { R: 35000, k: 0.5 },
 };
-const CLOUD_H = 6000;              // cloud deck altitude (m)
-const RAIN_H = 2500;               // rain falls from the cloud base at this height
+// the storm as a 3D volume: real cloud heights, stretched upwards like the map's
+// 3D terrain so the towers read when the map is tilted
+const CLOUD_VEX = 2.5;             // vertical exaggeration of the clouds
+const CLOUD_BASE = 1200 * CLOUD_VEX;   // cloud base (m)
+const CLOUD_TOP = 15000 * CLOUD_VEX;   // highest eyewall tops (m)
+const CLOUD_SLICES = 28;           // stacked height slices that make up the volume
+const RAIN_H = CLOUD_BASE;               // rain falls from the cloud base at this height
 const MAX_DROPS = 22000;
 const MASK_N = 96;                 // sea-mask grid over the storm (cells per side)
 const SURGE_LAND_M = 8;            // land below this (exaggerated m, ~5 m real) next to the sea floods
@@ -61,26 +66,38 @@ varying float v_layer;
 void main() {
   v_p = a_pos.xy * 1.15;
   v_layer = a_pos.z;
-  vec3 p = vec3(v_p * u_R, ${CLOUD_H.toFixed(1)} + a_pos.z * 900.0);
+  float hf = a_pos.z / ${(CLOUD_SLICES - 1).toFixed(1)};                          // 0 cloud base .. 1 top
+  vec3 p = vec3(v_p * u_R, ${CLOUD_BASE.toFixed(1)} + hf * ${(CLOUD_TOP - CLOUD_BASE).toFixed(1)});
   gl_Position = u_matrix * vec4(p.x * u_mpm, -p.y * u_mpm, p.z * u_mpm, 1.0);
 }`;
 const CLOUD_FS = `
 precision highp float;
-uniform float u_time, u_density, u_veil;
+uniform float u_time, u_density, u_veil, u_tilt;
 uniform vec3 u_flash;                // flash centre (unit radius) + brightness
 varying vec2 v_p;
 varying float v_layer;
 ${COMMON}
 void main() {
   float r = length(v_p);
+  float hf = v_layer / ${(CLOUD_SLICES - 1).toFixed(1)};                       // height in the storm, 0..1
   vec2 q = rot(v_p, -spin(r, u_time));
-  float n = fbm(q * 7.0 + v_layer * 5.3);
+  float n = fbm(q * 7.0 + hf * 2.1);                    // billows, changing with height
+  float nT = fbm(q * 3.0 + 11.0);                       // broad variation of the cloud-top height
   float b = bands(v_p, u_time);
-  float a = clamp((0.25 + 0.75 * b) * (n * 1.5 - 0.15), 0.0, 1.0) * smoothstep(1.1, 0.75, r) * u_veil
-          * smoothstep(0.035, 0.07, r) * (0.75 + 0.25 * u_density) * (0.9 - v_layer * 0.25);
-  vec3 col = mix(vec3(0.50, 0.53, 0.58), vec3(0.95, 0.96, 0.98), n * (0.6 + 0.4 * b));   // bright tops, grey gaps
-  float f = u_flash.z * exp(-dot(v_p - u_flash.xy, v_p - u_flash.xy) * 90.0);
-  col += vec3(0.7, 0.75, 1.0) * f;
+  // how high the cloud column reaches here: the eyewall towers tallest, the
+  // spiral bands climb to mid-levels, the gaps between them hold low cloud
+  float eyewall = smoothstep(0.05, 0.09, r) * (1.0 - smoothstep(0.16, 0.30, r));
+  float top = max(eyewall * (0.85 + 0.15 * nT), b * (0.35 + 0.35 * nT)) + 0.08 * n;
+  float body = (1.0 - smoothstep(top - 0.10, top + 0.02, hf)) * smoothstep(0.30, 0.55, n + 0.25 * b);
+  // the cirrus anvil: a thin sheet spread wide over the top of the storm
+  float anvil = smoothstep(0.72, 0.82, hf) * (1.0 - smoothstep(0.88, 0.98, hf)) * smoothstep(0.35, 0.7, fbm(q * 4.0 + 5.0)) * 0.45;
+  float edge = (1.0 - smoothstep(0.80, 1.12, r)) * smoothstep(0.045, 0.075, r);   // round storm, clear eye
+  // looking across the storm, a sight line crosses fewer slices: each one gets denser
+  float a = max(body, anvil) * edge * u_veil * (0.75 + 0.25 * u_density) * 0.20 * u_tilt;
+  // dark rain-laden bases, bright sunlit tops
+  vec3 col = mix(vec3(0.34, 0.37, 0.42), vec3(0.97, 0.98, 1.0), pow(hf, 0.55)) * (0.85 + 0.15 * n);
+  vec2 fd = v_p - u_flash.xy;
+  col += vec3(0.7, 0.75, 1.0) * u_flash.z * exp(-dot(fd, fd) * 90.0) * (1.0 - hf * 0.5);   // lightning glows inside
   gl_FragColor = vec4(col * a, a);
 }`;
 
@@ -183,7 +200,7 @@ function setup(context) {
   prog.rain = program(RAIN_VS, RAIN_FS, ['a_seed']);
   prog.sea = program(SEA_VS, SEA_FS, ['a_xy']);
   const q = [];
-  for (let l = 0; l < 2; l++) for (const [x, y] of [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]]) q.push(x, y, l);
+  for (let l = 0; l < CLOUD_SLICES; l++) for (const [x, y] of [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]]) q.push(x, y, l);   // bottom to top
   buf.cloud = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf.cloud); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(q), gl.STATIC_DRAW);
   buf.quad = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf.quad);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1]), gl.STATIC_DRAW);
@@ -298,12 +315,13 @@ function draw(matrix) {
     gl.useProgram(p.p);
     gl.uniformMatrix4fv(p.u.u_matrix, false, M); gl.uniform1f(p.u.u_mpm, mpm); gl.uniform1f(p.u.u_R, R);
     gl.uniform1f(p.u.u_time, t); gl.uniform1f(p.u.u_density, k);
-    const veil = Math.min(1, Math.max(0.5, 1 - (zoom - 9) * 0.15)) * (pitch > 60 ? 0.9 : 1);
+    const veil = Math.min(1, Math.max(0.5, 1 - (zoom - 9) * 0.15));
     gl.uniform1f(p.u.u_veil, veil);
+    gl.uniform1f(p.u.u_tilt, 1 + 2.2 * Math.min(1, Math.max(0, (pitch - 40) / 40)));
     gl.uniform3f(p.u.u_flash, ...flash(cell, t));
     gl.bindBuffer(gl.ARRAY_BUFFER, buf.cloud);
     gl.enableVertexAttribArray(p.a.a_pos); gl.vertexAttribPointer(p.a.a_pos, 3, gl.FLOAT, false, 0, 0);
-    gl.drawArrays(gl.TRIANGLES, 0, 12);
+    gl.drawArrays(gl.TRIANGLES, 0, 6 * CLOUD_SLICES);
     gl.disableVertexAttribArray(p.a.a_pos);
   }
   gl.depthMask(true);
