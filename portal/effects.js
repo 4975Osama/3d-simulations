@@ -8,6 +8,9 @@ let map, mapboxgl;   // resolved in initFX() — effects.js must not bind them a
 // module top: app.js pauses on its top-level data await, so later module
 // scripts can evaluate BEFORE window.map exists.
 
+// hazard types drawn by hazards3d.js, and the effect each one gets there
+const HAZARD_3D_KIND = { 'snow-emergencies': 'snow', 'glof-emergencies': 'glof', 'smog-fog': 'smog', 'heatwave': 'heat' };
+
 class AdvancedHazardAnimationSystem {
     constructor() {
         this.activeAnimations = new Map();
@@ -1304,51 +1307,10 @@ class AdvancedHazardAnimationSystem {
     // SNOW ANIMATION - BLIZZARD
     // ========================================
     createSnowAnimation(severity) {
+        // The effect itself is drawn in 3D at real size on the terrain
+        // (hazards3d.js, registered in addAnimationToMarker); this marker only tracks the site.
         const container = document.createElement('div');
         container.className = 'hazard-animation-container snow-container';
-
-        // Frost overlay
-        const frost = document.createElement('div');
-        frost.className = 'frost-overlay';
-        container.appendChild(frost);
-
-        // Wind effect
-        const wind = document.createElement('div');
-        wind.className = 'snow-wind';
-        container.appendChild(wind);
-
-        // Create multiple layers of snowflakes
-        const particleCount = severity === 'Very High' ? 50 : severity === 'High' ? 40 : 30;
-        const snowTypes = ['❄', '❅', '❆', '✻', '✼', '❉'];
-        const sizes = ['large', 'medium', 'small'];
-
-        for (let layer = 0; layer < 3; layer++) {
-            const snowLayer = document.createElement('div');
-            snowLayer.className = 'snow-layer';
-            snowLayer.style.zIndex = layer;
-
-            for (let i = 0; i < particleCount / 3; i++) {
-                const snowflake = document.createElement('div');
-                snowflake.className = `snowflake ${sizes[layer]}`;
-                snowflake.innerHTML = snowTypes[Math.floor(Math.random() * snowTypes.length)];
-                snowflake.style.left = `${Math.random() * 100}%`;
-                snowflake.style.animationDelay = `${Math.random() * 5}s`;
-                snowflake.style.opacity = 0.7 + Math.random() * 0.3;
-                snowLayer.appendChild(snowflake);
-            }
-            container.appendChild(snowLayer);
-        }
-
-        // Ice crystals
-        for (let i = 0; i < 8; i++) {
-            const crystal = document.createElement('div');
-            crystal.className = 'ice-crystal';
-            crystal.style.left = `${10 + Math.random() * 80}%`;
-            crystal.style.top = `${10 + Math.random() * 80}%`;
-            crystal.style.animationDelay = `${Math.random() * 2}s`;
-            container.appendChild(crystal);
-        }
-
         return container;
     }
 
@@ -1357,45 +1319,10 @@ class AdvancedHazardAnimationSystem {
     // ========================================
     // Create Fire Animation
     createFireAnimation() {
+        // The fire itself burns in 3D at real size on the terrain (fire3d.js,
+        // registered in addAnimationToMarker); this marker only tracks the site.
         const container = document.createElement('div');
         container.className = 'hazard-animation-container fire-container';
-
-        // Fire glow effect
-        const glow = document.createElement('div');
-        glow.className = 'fire-glow';
-        container.appendChild(glow);
-
-        // Fire particle colors
-        const colors = ['#ff4500', '#ff6600', '#ff8c00', '#ffa500', '#ffcc00', '#ff3300'];
-
-        // Create 25 fire particles
-        for (let i = 0; i < 25; i++) {
-            const particle = document.createElement('div');
-            particle.className = 'fire-particle';
-
-            // Random size between 5-20px
-            const size = 5 + Math.random() * 15;
-            particle.style.width = `${size}px`;
-            particle.style.height = `${size}px`;
-
-            // Position particles in the center area (30-70% from left)
-            particle.style.left = `${30 + Math.random() * 40}%`;
-
-            // Start from bottom 20%
-            particle.style.bottom = '20%';
-
-            // Random fire color gradient
-            particle.style.background = `radial-gradient(circle, ${colors[Math.floor(Math.random() * colors.length)]}, transparent)`;
-
-            // Random animation duration (0.8-1.8 seconds)
-            particle.style.animationDuration = `${0.8 + Math.random() * 1}s`;
-
-            // Random animation delay (0-1 second)
-            particle.style.animationDelay = `${Math.random() * 1}s`;
-
-            container.appendChild(particle);
-        }
-
         return container;
     }
 
@@ -1500,68 +1427,10 @@ class AdvancedHazardAnimationSystem {
     // LANDSLIDE ANIMATION - DEBRIS FLOW
     // ========================================
     createLandslideAnimation(severity) {
+        // The slide itself runs in 3D down the real terrain (landslide3d.js,
+        // registered in addAnimationToMarker); this marker only tracks the site.
         const container = document.createElement('div');
         container.className = 'hazard-animation-container landslide-container';
-
-        // Mountain silhouette
-        const mountain = document.createElement('div');
-        mountain.className = 'mountain-silhouette';
-        container.appendChild(mountain);
-
-        // Dust plumes
-        for (let i = 0; i < 4; i++) {
-            const dust = document.createElement('div');
-            dust.className = 'dust-plume';
-            dust.style.width = `${50 + Math.random() * 40}px`;
-            dust.style.height = `${40 + Math.random() * 30}px`;
-            dust.style.left = `${20 + Math.random() * 60}%`;
-            dust.style.bottom = `${15 + i * 10}%`;
-            dust.style.animationDelay = `${i * 1}s`;
-            container.appendChild(dust);
-        }
-
-        // Mud flow
-        const mudFlow = document.createElement('div');
-        mudFlow.className = 'mud-flow';
-        container.appendChild(mudFlow);
-
-        // Rock boulders
-        const boulderCount = severity === 'Very High' ? 12 : severity === 'High' ? 9 : 6;
-        const rockColors = [
-            'linear-gradient(135deg, #8B4513 0%, #654321 50%, #4a3728 100%)',
-            'linear-gradient(135deg, #6B5344 0%, #5a4535 50%, #493829 100%)',
-            'linear-gradient(135deg, #7B6354 0%, #6a5445 50%, #594536 100%)'
-        ];
-
-        for (let i = 0; i < boulderCount; i++) {
-            const boulder = document.createElement('div');
-            boulder.className = 'rock-boulder';
-            const size = 8 + Math.random() * 18;
-            boulder.style.width = `${size}px`;
-            boulder.style.height = `${size * 0.8}px`;
-            boulder.style.left = `${25 + Math.random() * 50}%`;
-            boulder.style.top = '5%';
-            boulder.style.background = rockColors[Math.floor(Math.random() * rockColors.length)];
-            boulder.style.animationDuration = `${2 + Math.random() * 2}s`;
-            boulder.style.animationDelay = `${Math.random() * 3}s`;
-            container.appendChild(boulder);
-        }
-
-        // Small debris
-        for (let i = 0; i < 25; i++) {
-            const debris = document.createElement('div');
-            debris.className = 'small-debris';
-            const size = 2 + Math.random() * 5;
-            debris.style.width = `${size}px`;
-            debris.style.height = `${size}px`;
-            debris.style.left = `${20 + Math.random() * 60}%`;
-            debris.style.top = '10%';
-            debris.style.borderRadius = `${Math.random() * 50}%`;
-            debris.style.animationDuration = `${1.5 + Math.random() * 2}s`;
-            debris.style.animationDelay = `${Math.random() * 3}s`;
-            container.appendChild(debris);
-        }
-
         return container;
     }
 
@@ -1624,49 +1493,10 @@ class AdvancedHazardAnimationSystem {
     // HEATWAVE ANIMATION - INTENSE HEAT
     // ========================================
     createHeatwaveAnimation(severity) {
+        // The effect itself is drawn in 3D at real size on the terrain
+        // (hazards3d.js, registered in addAnimationToMarker); this marker only tracks the site.
         const container = document.createElement('div');
         container.className = 'hazard-animation-container heatwave-container';
-
-        // Sun core
-        const sun = document.createElement('div');
-        sun.className = 'sun-core';
-        container.appendChild(sun);
-
-        // Sun rays
-        const rayCount = 12;
-        for (let i = 0; i < rayCount; i++) {
-            const ray = document.createElement('div');
-            ray.className = 'sun-ray';
-            ray.style.transform = `translateX(-50%) rotate(${i * (360 / rayCount)}deg)`;
-            ray.style.animationDelay = `${i * 0.15}s`;
-            container.appendChild(ray);
-        }
-
-        // Heat wave bands
-        const bandCount = severity === 'Very High' ? 6 : severity === 'High' ? 5 : 4;
-        for (let i = 0; i < bandCount; i++) {
-            const band = document.createElement('div');
-            band.className = 'heat-wave-band';
-            band.style.top = `${45 + i * 10}%`;
-            band.style.animationDelay = `${i * 0.25}s`;
-            container.appendChild(band);
-        }
-
-        // Heat shimmer particles
-        for (let i = 0; i < 12; i++) {
-            const shimmer = document.createElement('div');
-            shimmer.className = 'heat-shimmer-particle';
-            shimmer.style.left = `${10 + Math.random() * 80}%`;
-            shimmer.style.bottom = `${20 + Math.random() * 30}%`;
-            shimmer.style.animationDelay = `${Math.random() * 2}s`;
-            container.appendChild(shimmer);
-        }
-
-        // Thermometer indicator
-        const thermo = document.createElement('div');
-        thermo.className = 'thermometer-indicator';
-        container.appendChild(thermo);
-
         return container;
     }
 
@@ -1674,62 +1504,10 @@ class AdvancedHazardAnimationSystem {
     // GLOF ANIMATION - GLACIAL BURST
     // ========================================
     createGLOFAnimation(severity) {
+        // The effect itself is drawn in 3D at real size on the terrain
+        // (hazards3d.js, registered in addAnimationToMarker); this marker only tracks the site.
         const container = document.createElement('div');
         container.className = 'hazard-animation-container glof-container';
-
-        // Glacier mass
-        const glacier = document.createElement('div');
-        glacier.className = 'glacier-mass';
-        container.appendChild(glacier);
-
-        // Glacial mist
-        for (let i = 0; i < 3; i++) {
-            const mist = document.createElement('div');
-            mist.className = 'glacial-mist';
-            mist.style.width = `${60 + Math.random() * 40}px`;
-            mist.style.height = `${40 + Math.random() * 30}px`;
-            mist.style.left = `${10 + Math.random() * 80}%`;
-            mist.style.top = `${20 + i * 20}%`;
-            mist.style.animationDelay = `${i * 1.5}s`;
-            container.appendChild(mist);
-        }
-
-        // Glacial burst waves
-        const burstCount = severity === 'Very High' ? 5 : severity === 'High' ? 4 : 3;
-        for (let i = 0; i < burstCount; i++) {
-            const burst = document.createElement('div');
-            burst.className = 'glacial-burst-wave';
-            burst.style.animationDelay = `${i * 0.5}s`;
-            container.appendChild(burst);
-        }
-
-        // Ice calving
-        const iceCount = severity === 'Very High' ? 8 : severity === 'High' ? 6 : 4;
-        for (let i = 0; i < iceCount; i++) {
-            const ice = document.createElement('div');
-            ice.className = 'ice-calving';
-            const size = 8 + Math.random() * 15;
-            ice.style.width = `${size}px`;
-            ice.style.height = `${size}px`;
-            ice.style.left = `${30 + Math.random() * 40}%`;
-            ice.style.top = '25%';
-            ice.style.animationDuration = `${2 + Math.random() * 2}s`;
-            ice.style.animationDelay = `${Math.random() * 3}s`;
-            container.appendChild(ice);
-        }
-
-        // Water torrents
-        for (let i = 0; i < 4; i++) {
-            const torrent = document.createElement('div');
-            torrent.className = 'water-torrent';
-            torrent.style.width = `${20 + Math.random() * 25}px`;
-            torrent.style.height = `${35 + Math.random() * 25}px`;
-            torrent.style.left = `${25 + i * 15}%`;
-            torrent.style.top = '45%';
-            torrent.style.animationDelay = `${i * 0.4}s`;
-            container.appendChild(torrent);
-        }
-
         return container;
     }
 
@@ -1737,71 +1515,10 @@ class AdvancedHazardAnimationSystem {
     // COASTAL/CYCLONE ANIMATION - STORM
     // ========================================
     createCoastalAnimation(severity) {
+        // The cyclone itself turns in 3D at real size over the sea (coastal3d.js,
+        // registered in addAnimationToMarker); this marker only tracks the site.
         const container = document.createElement('div');
         container.className = 'hazard-animation-container coastal-container';
-
-        // Cyclone eye
-        const eye = document.createElement('div');
-        eye.className = 'cyclone-eye';
-        container.appendChild(eye);
-
-        // Spiral bands
-        const bandCount = 5;
-        for (let i = 0; i < bandCount; i++) {
-            const band = document.createElement('div');
-            band.className = 'spiral-band';
-            const size = 50 + i * 30;
-            band.style.width = `${size}px`;
-            band.style.height = `${size}px`;
-            band.style.animationDuration = `${2 + i * 0.5}s`;
-            band.style.borderWidth = `${4 - i * 0.5}px`;
-            band.style.opacity = 0.8 - i * 0.1;
-            if (i % 2 === 1) band.style.animationDirection = 'reverse';
-            container.appendChild(band);
-        }
-
-        // Cloud masses
-        for (let i = 0; i < 6; i++) {
-            const cloud = document.createElement('div');
-            cloud.className = 'cloud-mass';
-            cloud.style.width = `${30 + Math.random() * 25}px`;
-            cloud.style.height = `${20 + Math.random() * 15}px`;
-            cloud.style.left = '50%';
-            cloud.style.top = '50%';
-            cloud.style.animationDuration = `${3 + Math.random() * 2}s`;
-            cloud.style.animationDelay = `${i * 0.5}s`;
-            container.appendChild(cloud);
-        }
-
-        // Rain bands
-        const rainCount = severity === 'Very High' ? 30 : severity === 'High' ? 20 : 12;
-        for (let i = 0; i < rainCount; i++) {
-            const rain = document.createElement('div');
-            rain.className = 'rain-band';
-            rain.style.left = `${Math.random() * 100}%`;
-            rain.style.top = `${Math.random() * 30}%`;
-            rain.style.setProperty('--rainAngle', `${-30 + Math.random() * 60}deg`);
-            rain.style.animationDuration = `${0.3 + Math.random() * 0.4}s`;
-            rain.style.animationDelay = `${Math.random() * 2}s`;
-            container.appendChild(rain);
-        }
-
-        // Lightning
-        for (let i = 0; i < 3; i++) {
-            const lightning = document.createElement('div');
-            lightning.className = 'lightning-flash';
-            lightning.style.left = `${20 + Math.random() * 60}%`;
-            lightning.style.top = `${10 + Math.random() * 30}%`;
-            lightning.style.transform = `rotate(${-15 + Math.random() * 30}deg)`;
-            lightning.style.animationDelay = `${i * 1.3}s`;
-            container.appendChild(lightning);
-        }
-
-        // Storm surge
-        const surge = document.createElement('div');
-        surge.className = 'storm-surge';
-        container.appendChild(surge);
-
         return container;
     }
 
@@ -1809,74 +1526,10 @@ class AdvancedHazardAnimationSystem {
     // SMOG/FOG ANIMATION - ATMOSPHERIC
     // ========================================
     createSmogAnimation(severity) {
+        // The effect itself is drawn in 3D at real size on the terrain
+        // (hazards3d.js, registered in addAnimationToMarker); this marker only tracks the site.
         const container = document.createElement('div');
         container.className = 'hazard-animation-container smog-container';
-
-        // City silhouette
-        const city = document.createElement('div');
-        city.className = 'city-silhouette';
-        container.appendChild(city);
-
-        // Visibility indicator
-        const visibility = document.createElement('div');
-        visibility.className = 'visibility-indicator';
-        container.appendChild(visibility);
-
-        // Dense smog layers
-        const layerCount = severity === 'Very High' ? 5 : severity === 'High' ? 4 : 3;
-        for (let i = 0; i < layerCount; i++) {
-            const layer = document.createElement('div');
-            layer.className = 'smog-layer-dense';
-            layer.style.animationDelay = `${i * 1.5}s`;
-            layer.style.opacity = 0.3 + i * 0.1;
-            container.appendChild(layer);
-        }
-
-        // Haze bands
-        for (let i = 0; i < 4; i++) {
-            const haze = document.createElement('div');
-            haze.className = 'haze-band';
-            haze.style.top = `${20 + i * 20}%`;
-            haze.style.animationDelay = `${i * 2}s`;
-            container.appendChild(haze);
-        }
-
-        // Pollution particles
-        const particleCount = severity === 'Very High' ? 25 : severity === 'High' ? 18 : 12;
-        const particleColors = [
-            'rgba(100, 100, 100, 0.5)',
-            'rgba(120, 120, 120, 0.4)',
-            'rgba(80, 80, 80, 0.6)',
-            'rgba(140, 130, 110, 0.4)'
-        ];
-
-        for (let i = 0; i < particleCount; i++) {
-            const particle = document.createElement('div');
-            particle.className = 'pollution-particle';
-            const size = 10 + Math.random() * 25;
-            particle.style.width = `${size}px`;
-            particle.style.height = `${size}px`;
-            particle.style.left = `${Math.random() * 90}%`;
-            particle.style.top = `${Math.random() * 70}%`;
-            particle.style.background = `radial-gradient(circle, ${particleColors[Math.floor(Math.random() * particleColors.length)]}, transparent)`;
-            particle.style.setProperty('--particleOpacity', `${0.3 + Math.random() * 0.4}`);
-            particle.style.animationDuration = `${4 + Math.random() * 4}s`;
-            particle.style.animationDelay = `${Math.random() * 3}s`;
-            container.appendChild(particle);
-        }
-
-        // Smog wisps
-        for (let i = 0; i < 6; i++) {
-            const wisp = document.createElement('div');
-            wisp.className = 'smog-wisp';
-            wisp.style.width = `${40 + Math.random() * 60}px`;
-            wisp.style.top = `${15 + Math.random() * 60}%`;
-            wisp.style.left = '0';
-            wisp.style.animationDuration = `${6 + Math.random() * 4}s`;
-            wisp.style.animationDelay = `${i * 1.5}s`;
-            container.appendChild(wisp);
-        }
-
         return container;
     }
 
@@ -1925,6 +1578,11 @@ class AdvancedHazardAnimationSystem {
             // rain + lightning: a 3D storm cell above the site
             window.storm3d?.addCell({ id: markerId, lngLat: coordinates, severity });
         }
+        if (hazardType === 'fire-emergencies') window.fire3d?.addCell({ id: markerId, lngLat: coordinates, severity });
+        if (hazardType === 'landslide-mudslide') window.landslide3d?.addCell({ id: markerId, lngLat: coordinates, severity });
+        if (hazardType === 'coastal-emergencies') window.coastal3d?.addCell({ id: markerId, lngLat: coordinates, severity });
+        const kind3d = HAZARD_3D_KIND[hazardType];
+        if (kind3d) window.hazards3d?.addCell({ id: hazardType + ':' + markerId, kind: kind3d, lngLat: coordinates, severity });
 
         const animationMarker = new window.mapboxgl.Marker({
             element: animation,
@@ -1955,6 +1613,10 @@ class AdvancedHazardAnimationSystem {
             });
             this.activeAnimations.delete(hazardType);
             if (hazardType === 'floods') window.storm3d?.clearCells();
+            if (hazardType === 'fire-emergencies') window.fire3d?.clearCells();
+            if (hazardType === 'landslide-mudslide') window.landslide3d?.clearCells();
+            if (hazardType === 'coastal-emergencies') window.coastal3d?.clearCells();
+            if (HAZARD_3D_KIND[hazardType]) window.hazards3d?.clearCells(HAZARD_3D_KIND[hazardType]);
         }
     }
 
@@ -1973,6 +1635,10 @@ class AdvancedHazardAnimationSystem {
         });
         this.activeAnimations.clear();
         window.storm3d?.clearCells();
+        window.fire3d?.clearCells();
+        window.landslide3d?.clearCells();
+        window.coastal3d?.clearCells();
+        window.hazards3d?.clearCells();
     }
 }
 

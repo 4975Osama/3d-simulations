@@ -373,6 +373,86 @@ nav a, .navbtn {
       flex: none;
     }
 
+    /* Tech-EW Hazards -> year groups (2026 / 2027), each expanding to the hazard list */
+    .yeargroup {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .yearbtn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: rgba(99, 128, 200, .13);
+      color: #fff;
+      font: inherit;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .yearbtn:hover {
+      background: rgba(99, 128, 200, .24);
+    }
+
+    .yeargroup.open > .yearbtn {
+      background: linear-gradient(135deg, rgba(37, 99, 235, .55), rgba(79, 70, 229, .55));
+      border-color: rgba(147, 197, 253, .45);
+    }
+
+    .yearbtn .ycal {
+      width: 18px;
+      height: 18px;
+      stroke: #fff;
+      fill: none;
+      stroke-width: 1.8;
+      flex: none;
+    }
+
+    .yearbtn .ycnt {
+      margin-left: auto;
+      background: linear-gradient(135deg, #fb7185, #e11d48);
+      border-radius: 10px;
+      padding: 0 7px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .yearbtn .chev {
+      width: 16px;
+      height: 16px;
+      stroke: #c7d2fe;
+      fill: none;
+      stroke-width: 2;
+      margin-left: auto;
+      flex: none;
+      transition: transform .15s;
+    }
+
+    .yearbtn .ycnt:not([hidden]) + .chev {
+      margin-left: 6px;
+    }
+
+    .yeargroup.open > .yearbtn .chev {
+      transform: rotate(180deg);
+    }
+
+    .yearlist {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+      margin: 10px 0 4px 10px;
+    }
+
+    .yeargroup.open > .yearlist {
+      display: flex;
+    }
+
     .switch {
       position: relative;
       display: inline-block;
@@ -2766,6 +2846,10 @@ nav a, .navbtn {
   <script src="./config.js"></script>
   <script type="module" src="./app.js"></script>
   <script type="module" src="./storm3d.js"></script>
+  <script type="module" src="./fire3d.js"></script>
+  <script type="module" src="./landslide3d.js"></script>
+  <script type="module" src="./coastal3d.js"></script>
+  <script type="module" src="./hazards3d.js"></script>
   <script type="module" src="./effects.js"></script>
   <script type="module" src="./hazards.js"></script>
   <script type="module" src="./twin.js"></script>

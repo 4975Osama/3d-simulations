@@ -303,6 +303,8 @@ function setScreenFlash(v) {
 /* ---------------------------------------------------------------- layer lifecycle */
 // isStyleLoaded() is false while any tile is still loading, so just try, and
 // retry shortly if the style itself isn't ready yet
+// the 3D effect layers (storm3d, fire3d, landslide3d) may sit above each other; anything else goes below
+const FX_LAYERS = ['storm3d', 'fire3d', 'landslide3d', 'coastal3d', 'hazards3d'];
 let retry = 0, movedAbove = '';
 function ensureLayer() {
   if (!map || !map.getStyle()) return;
@@ -311,7 +313,7 @@ function ensureLayer() {
     // layers out, so read the draw order, else remember what was on top when we moved
     const order = map.style && map.style._order;
     const layers = map.getStyle().layers, top = layers.length ? layers[layers.length - 1].id : '';
-    const onTop = order ? order[order.length - 1] === LAYER_ID : top === movedAbove;
+    const onTop = order ? order.slice(order.indexOf(LAYER_ID) + 1).every((id) => FX_LAYERS.includes(id)) : top === movedAbove;
     if (!onTop) { map.moveLayer(LAYER_ID); movedAbove = top; }
     return;
   }

@@ -867,7 +867,10 @@ export function createWaterSurface(defaults = {}) {
     return Number(v);
   }
 
-  /** dominant-axis bearing (deg) of a ring — used when the caller supplies none */
+  /** dominant-axis bearing (deg) of a ring — used when the caller supplies none.
+   *  An axis has two ends; take the southward one (bearing 90..270), so standing
+   *  water with no known current (the flood sheets) drifts down-map, the way
+   *  Pakistan's plains drain towards the Arabian Sea, instead of uphill. */
   function axisBearing(ring) {
     let cx = 0, cy = 0;
     for (const p of ring) { cx += p[0]; cy += p[1]; }
@@ -880,7 +883,7 @@ export function createWaterSurface(defaults = {}) {
     }
     const theta = 0.5 * Math.atan2(2 * sxy, sxx - syy); // major axis angle from +x
     const deg = (90 - (theta * 180) / Math.PI + 360) % 360;
-    return deg;
+    return deg < 90 || deg > 270 ? (deg + 180) % 360 : deg;
   }
 
   /** exact per-triangle winding in geographic space (earcut normalises its own

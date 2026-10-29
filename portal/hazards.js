@@ -62,6 +62,11 @@ function catGradient(cat) {
   return `linear-gradient(135deg, ${g[0]}, ${g[1]})`;
 }
 
+/* The submenu is split by year: "2026 Hazards" and "2027 Hazards" each
+   expand to the full hazard list. A category is on the map while it is
+   ticked under either year. */
+const YEARS = ['2026', '2027'];
+const picked = new Set();  // "year|category" rows switched on
 const onSet = new Set();   // categories currently shown on the map
 
 /* rebuild every currently-on category from scratch — the underlying engine
@@ -76,8 +81,10 @@ function rebuild() {
   });
 }
 
-function toggleCategory(cat, on) {
-  if (on) onSet.add(cat); else onSet.delete(cat);
+function toggleRow(year, cat, on) {
+  if (on) picked.add(year + '|' + cat); else picked.delete(year + '|' + cat);
+  onSet.clear();
+  picked.forEach((k) => onSet.add(k.split('|')[1]));
   rebuild();
 }
 
@@ -95,25 +102,48 @@ window.__hazIconFallback = (img, cat) => {
   img.outerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8">${icon}</svg>`;
 };
 
-function rowHTML(cat) {
+function rowHTML(year, cat) {
   const info = window.hazardData[cat];
   const grad = catGradient(cat);
-  const on = onSet.has(cat);
-  return `<button class="subrow${on ? ' active' : ''}" data-cat="${cat}" type="button" style="--catgrad:${grad}">
+  const on = picked.has(year + '|' + cat);
+  return `<button class="subrow${on ? ' active' : ''}" data-year="${year}" data-cat="${cat}" type="button" style="--catgrad:${grad}">
     <span class="cicon">${iconMarkup(cat)}</span>
     <span class="subname">${info.name}</span>
     <span class="cnt">${info.locations.length}</span>
   </button>`;
 }
 
+const CAL_ICON = '<svg class="ycal" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>';
+const CHEV = '<svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>';
+
+function yearHTML(year) {
+  return `<div class="yeargroup" data-year="${year}">
+    <button class="yearbtn" type="button">${CAL_ICON}<span>${year} Hazards</span><span class="ycnt" hidden></span>${CHEV}</button>
+    <div class="yearlist">${CAT_ORDER.map((cat) => rowHTML(year, cat)).join('')}</div>
+  </div>`;
+}
+
+/* "3 on" badge on a year button while any of its hazards are shown */
+function updateYearCounts() {
+  document.querySelectorAll('#techew-sub .yeargroup').forEach((g) => {
+    const n = [...picked].filter((k) => k.startsWith(g.dataset.year + '|')).length;
+    const b = g.querySelector('.ycnt');
+    b.hidden = !n;
+    b.textContent = n + ' on';
+  });
+}
+
 function renderSubnav() {
   const sub = $('techew-sub');
-  sub.innerHTML = CAT_ORDER.map(rowHTML).join('');
+  sub.innerHTML = YEARS.map(yearHTML).join('');
+  sub.querySelectorAll('.yearbtn').forEach((btn) => {
+    btn.addEventListener('click', () => btn.closest('.yeargroup').classList.toggle('open'));
+  });
   sub.querySelectorAll('.subrow').forEach((row) => {
     row.addEventListener('click', () => {
-      const cat = row.dataset.cat;
       row.classList.toggle('active');
-      toggleCategory(cat, row.classList.contains('active'));
+      toggleRow(row.dataset.year, row.dataset.cat, row.classList.contains('active'));
+      updateYearCounts();
     });
   });
 }
