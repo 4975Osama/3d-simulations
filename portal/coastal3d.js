@@ -8,7 +8,12 @@
    Land and sea come from the terrain data: a grid of elevations over the
    storm becomes a sea mask, so foam stays on the water and the surge only
    floods the coastal strip. setCells([{ id, lngLat, severity }]) puts one
-   cyclone on each site (effects.js registers them). */
+   cyclone on each site (effects.js registers them).
+
+   In the eye stands a giant waterspout: a twisting grey funnel from the cloud
+   down to the sea, wound with spiral bands that climb as it turns, snaking
+   and leaning, white with spray at its foot where the sea churns. It shows
+   as the map is tilted (from straight above it would only be a dot). */
 
 let map = null;
 const LAYER_ID = 'coastal3d';
@@ -21,12 +26,14 @@ const SEVERITY = {                 // cyclone radius (m), rain share
 };
 // the storm as a 3D volume: real cloud heights, stretched upwards like the map's
 // 3D terrain so the towers read when the map is tilted
-const CLOUD_VEX = 2.5;             // vertical exaggeration of the clouds
+const CLOUD_VEX = 1.6;             // vertical exaggeration of the clouds
 const CLOUD_BASE = 1200 * CLOUD_VEX;   // cloud base (m)
 const CLOUD_TOP = 15000 * CLOUD_VEX;   // highest eyewall tops (m)
 const CLOUD_SLICES = 28;           // stacked height slices that make up the volume
 const RAIN_H = CLOUD_BASE;               // rain falls from the cloud base at this height
 const MAX_DROPS = 22000;
+const SPOUT_H = 0.62;              // waterspout top, share of the way from cloud base to the highest tops
+const SPOUT_AROUND = 64, SPOUT_UP = 96;   // funnel mesh: segments around, rings up
 const MASK_N = 96;                 // sea-mask grid over the storm (cells per side)
 const SURGE_LAND_M = 8;            // land below this (exaggerated m, ~5 m real) next to the sea floods
 
@@ -50,8 +57,15 @@ float bands(vec2 p, float t) {
   float r = length(p);
   vec2 q = rot(p, -spin(r, t));
   float th = atan(q.y, q.x);
-  float arm = sin(th * 3.0 + log(r + 0.04) * 6.0);
-  float b = smoothstep(-0.35, 0.85, arm);
+  // not neat identical arms: one long principal band, secondary bands and thin
+  // feeder bands, each winding at its own pitch, broken up unevenly
+  float lr = log(r + 0.04);
+  float arm = 0.6 * sin(th + lr * 4.5)
+            + 0.35 * sin(2.0 * th + lr * 6.5 + 1.7)
+            + 0.2 * sin(5.0 * th + lr * 10.0 + 4.0);
+  arm += (fbm(q * 2.5 + 3.0) - 0.5) * 1.1;
+  float b = smoothstep(-0.1, 0.8, arm);
+  b = max(b, 0.85 * (1.0 - smoothstep(0.16, 0.36, r)));     // the dense central overcast round the eye
   float eyewall = smoothstep(0.045, 0.08, r) * smoothstep(0.22, 0.1, r);
   return max(b * smoothstep(1.05, 0.55, r), eyewall) * smoothstep(0.035, 0.065, r);
 }`;
@@ -72,7 +86,7 @@ void main() {
 }`;
 const CLOUD_FS = `
 precision highp float;
-uniform float u_time, u_density, u_veil, u_tilt;
+uniform float u_time, u_density, u_veil, u_tilt, u_spout, u_eyeZ;
 uniform vec3 u_flash;                // flash centre (unit radius) + brightness
 varying vec2 v_p;
 varying float v_layer;
@@ -91,11 +105,17 @@ void main() {
   float body = (1.0 - smoothstep(top - 0.10, top + 0.02, hf)) * smoothstep(0.30, 0.55, n + 0.25 * b);
   // the cirrus anvil: a thin sheet spread wide over the top of the storm
   float anvil = smoothstep(0.72, 0.82, hf) * (1.0 - smoothstep(0.88, 0.98, hf)) * smoothstep(0.35, 0.7, fbm(q * 4.0 + 5.0)) * 0.45;
+  // tilted, the low cloud near the eye clears so the waterspout stands in open air under the cloud ceiling
+  body *= 1.0 - u_spout * (1.0 - smoothstep(0.14, 0.34, r)) * (1.0 - smoothstep(0.5, 0.68, hf));
+  anvil *= 1.0 - 0.85 * u_spout * (1.0 - smoothstep(0.2, 0.42, r));   // and the canopy opens over the eye
   float edge = (1.0 - smoothstep(0.80, 1.12, r)) * smoothstep(0.045, 0.075, r);   // round storm, clear eye
   // looking across the storm, a sight line crosses fewer slices: each one gets denser
   float a = max(body, anvil) * edge * u_veil * (0.75 + 0.25 * u_density) * 0.20 * u_tilt;
   // dark rain-laden bases, bright sunlit tops
   vec3 col = mix(vec3(0.34, 0.37, 0.42), vec3(0.97, 0.98, 1.0), pow(hf, 0.55)) * (0.85 + 0.15 * n);
+  // seen from underneath (a low view from below the cloud), it is the dark, shadowed base
+  float sliceZ = ${CLOUD_BASE.toFixed(1)} + hf * ${(CLOUD_TOP - CLOUD_BASE).toFixed(1)};
+  col *= mix(1.0, 0.45, smoothstep(0.0, 4000.0, sliceZ - u_eyeZ));
   vec2 fd = v_p - u_flash.xy;
   col += vec3(0.7, 0.75, 1.0) * u_flash.z * exp(-dot(fd, fd) * 90.0) * (1.0 - hf * 0.5);   // lightning glows inside
   gl_FragColor = vec4(col * a, a);
@@ -105,7 +125,7 @@ const RAIN_VS = `
 precision highp float;
 attribute vec4 a_seed;               // angle01, radius01, phase01, end (0 head, 1 tail)
 uniform mat4 u_matrix;
-uniform float u_mpm, u_R, u_time;
+uniform float u_mpm, u_R, u_time, u_spout;
 varying float v_alpha;
 ${COMMON}
 void main() {
@@ -117,12 +137,78 @@ void main() {
   vec3 head = vec3(p * u_R + tangent * f * 600.0, ${RAIN_H.toFixed(1)} * (1.0 - f));
   vec3 pos = head + vec3(-tangent * a_seed.w * 90.0, a_seed.w * len);
   v_alpha = (0.35 + 0.65 * bands(p, u_time)) * smoothstep(1.05, 0.8, r) * smoothstep(0.0, 0.06, f) * smoothstep(1.0, 0.95, f) * mix(1.0, 0.25, a_seed.w);
+  v_alpha *= 1.0 - 0.75 * u_spout * (1.0 - smoothstep(0.12, 0.32, r));
   gl_Position = u_matrix * vec4(pos.x * u_mpm, -pos.y * u_mpm, pos.z * u_mpm, 1.0);
 }`;
 const RAIN_FS = `
 precision highp float;
 varying float v_alpha;
 void main() { gl_FragColor = vec4(0.80, 0.85, 0.92, 1.0) * v_alpha * 0.85; }`;
+
+// the waterspout: a tube from the sea up into the cloud (u_part 0), and a
+// skirt of spray thrown up round its foot (u_part 1); sizes in cyclone radii
+const SPOUT_VS = `
+precision highp float;
+attribute vec2 a_uv;                 // around (0..1), up (0..1)
+uniform mat4 u_matrix;
+uniform float u_mpm, u_R, u_H, u_time, u_part;
+varying vec2 v_uv;
+varying vec3 v_n, v_pos;
+// the column snakes slowly and leans a little downwind
+vec2 centre(float v, float t) {
+  return (vec2(sin(t * 0.21 + v * 2.3), cos(t * 0.17 + v * 1.9 + 1.0)) * 0.012 * v + vec2(0.02, 0.012) * v * v) * u_R;
+}
+void main() {
+  float a = a_uv.x * 6.2832, v = a_uv.y, t = u_time;
+  vec3 p;
+  if (u_part < 0.5) {
+    // narrow stem, flaring at the foot, opening wide into the cloud above
+    float r = 0.026 + 0.03 * pow(v, 2.0) + 0.014 * exp(-v * 14.0);
+    r *= 1.0 + 0.05 * sin(a * 3.0 + v * 18.0 - t * 2.4) + 0.03 * sin(a * 7.0 - v * 31.0 - t * 3.7);   // ragged, churning wall
+    p = vec3(centre(v, t) + vec2(cos(a), sin(a)) * r * u_R, v * u_H);
+  } else {
+    float r = 0.036 + 0.11 * pow(v, 0.7);
+    r *= 1.0 + 0.12 * sin(a * 5.0 + t * 1.7 + v * 9.0);                 // billowing
+    p = vec3(centre(0.0, t) + vec2(cos(a), sin(a)) * r * u_R, v * u_H * 0.12 * (1.0 - 0.35 * v));
+  }
+  v_uv = a_uv;
+  v_n = vec3(cos(a), sin(a), 0.0);
+  v_pos = p;
+  gl_Position = u_matrix * vec4(p.x * u_mpm, -p.y * u_mpm, p.z * u_mpm, 1.0);
+}`;
+const SPOUT_FS = `
+precision highp float;
+uniform float u_time, u_part, u_vis, u_solid;
+uniform vec3 u_eye;
+varying vec2 v_uv;
+varying vec3 v_n, v_pos;
+${COMMON}
+void main() {
+  float a = v_uv.x * 6.2832, v = v_uv.y, t = u_time;
+  vec3 n = normalize(v_n), view = normalize(u_eye - v_pos);
+  float facing = abs(dot(n, view));                         // 1 facing us, 0 at the silhouette
+  vec2 ring = vec2(cos(a), sin(a));                         // seamless round the column
+  if (u_part < 0.5) {
+    // spiral bands winding up the column, climbing as it turns
+    float helix = a * 4.0 + v * 36.0 - t * 2.2;
+    float warp = fbm(ring * 1.5 + vec2(v * 14.0, -t * 0.3)) * 3.0;
+    float bands = 0.5 + 0.5 * sin(helix + warp);
+    float streak = fbm(ring * 3.0 + vec2(v * 40.0 - t * 1.5, 0.0));
+    float light = 0.5 + 0.5 * max(0.0, dot(n, normalize(vec3(-0.5, 0.35, 0.5))));
+    vec3 col = mix(vec3(0.08, 0.10, 0.11), vec3(0.44, 0.48, 0.49), light * (0.2 + 0.55 * bands + 0.3 * streak));
+    col = mix(col, vec3(0.70, 0.73, 0.74), smoothstep(0.8, 0.97, bands) * 0.45 * light);   // pale edges of the bands
+    col = mix(col, vec3(0.84, 0.87, 0.89), (1.0 - smoothstep(0.0, 0.09, v)) * 0.75);   // white with spray at the foot
+    float alpha = smoothstep(0.0, 0.3, facing) * (1.0 - smoothstep(0.72, 1.0, v)) * u_vis;   // solid, melting into the cloud
+    // two passes: the solid body hides the cloud behind it; the thin, fading parts don't
+    if (alpha < 0.01 || (u_solid > 0.5) != (alpha >= 0.6)) discard;
+    gl_FragColor = vec4(col * alpha, alpha);
+  } else {
+    float mist = fbm(ring * 3.0 + vec2(-t * 1.2, v * 6.0 - t * 0.7));
+    float alpha = smoothstep(0.2, 0.75, mist) * (1.0 - smoothstep(0.4, 1.0, v)) * 0.85 * (0.35 + 0.65 * facing) * u_vis;
+    if (alpha < 0.005) discard;
+    gl_FragColor = vec4(vec3(0.9, 0.92, 0.94) * alpha, alpha);
+  }
+}`;
 
 // the sea surface: whitecaps, swell running out from the storm, surf on the coast, surge on the shore
 const SEA_VS = `
@@ -139,7 +225,7 @@ void main() {
 const SEA_FS = `
 precision highp float;
 uniform sampler2D u_mask;            // r: sea (1) / land (0); g: low coastal land the surge can reach
-uniform float u_time, u_texel;
+uniform float u_time, u_texel, u_spout;
 varying vec2 v_p;
 ${COMMON}
 void main() {
@@ -165,7 +251,9 @@ void main() {
   float surfZone = sea * (1.0 - near) * 4.0;               // sea cells with land around
   float surf = clamp(surfZone, 0.0, 1.0) * wind * (0.5 + 0.5 * sin(u_time * 3.0 - r * 300.0));
   float surge = (1.0 - sea) * low * clamp(near * 2.5, 0.0, 1.0) * wind;
-  float aFoam = clamp(foam * 0.7 + surf * 0.9, 0.0, 0.9);
+  // the sea boils white round the waterspout's foot
+  float boil = (1.0 - smoothstep(0.03, 0.15, r)) * smoothstep(0.3, 0.65, fbm(rot(v_p, -u_time * 0.8) * 60.0)) * u_spout * sea;
+  float aFoam = clamp(foam * 0.7 + surf * 0.9 + boil, 0.0, 0.9);
   // storm surge: murky sea water over the low shore
   vec3 surgeCol = vec3(0.30, 0.38, 0.40) + 0.15 * fbm(v_p * 300.0 + u_time * 0.3);
   float aSurge = surge * 0.8;
@@ -199,6 +287,15 @@ function setup(context) {
   prog.cloud = program(CLOUD_VS, CLOUD_FS, ['a_pos']);
   prog.rain = program(RAIN_VS, RAIN_FS, ['a_seed']);
   prog.sea = program(SEA_VS, SEA_FS, ['a_xy']);
+  prog.spout = program(SPOUT_VS, SPOUT_FS, ['a_uv']);
+  const tube = [];
+  for (let j = 0; j < SPOUT_UP; j++) {
+    for (let i = 0; i < SPOUT_AROUND; i++) {
+      const u0 = i / SPOUT_AROUND, u1 = (i + 1) / SPOUT_AROUND, v0 = j / SPOUT_UP, v1 = (j + 1) / SPOUT_UP;
+      tube.push(u0, v0, u1, v0, u1, v1, u0, v0, u1, v1, u0, v1);
+    }
+  }
+  buf.spout = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf.spout); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(tube), gl.STATIC_DRAW);
   const q = [];
   for (let l = 0; l < CLOUD_SLICES; l++) for (const [x, y] of [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]]) q.push(x, y, l);   // bottom to top
   buf.cloud = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf.cloud); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(q), gl.STATIC_DRAW);
@@ -276,7 +373,8 @@ function render(_gl, matrix) {
 function draw(matrix) {
   if (!gl || !state.cells.length || map.getZoom() < MIN_ZOOM) return;
   const now = performance.now(), { clientWidth: w, clientHeight: h } = map.getCanvas();
-  const zoom = map.getZoom(), pitch = map.getPitch();
+  const zoom = map.getZoom(), pitch = map.getPitch(), cam = map.getFreeCameraOptions().position;
+  const spoutVis = Math.min(1, Math.max(0, (pitch - 20) / 25));   // the waterspout shows as the map tilts
   gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
   gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(false);
   for (const cell of state.cells) {
@@ -292,7 +390,7 @@ function draw(matrix) {
     let p = prog.sea;
     gl.useProgram(p.p);
     gl.uniformMatrix4fv(p.u.u_matrix, false, M); gl.uniform1f(p.u.u_mpm, mpm); gl.uniform1f(p.u.u_R, R);
-    gl.uniform1f(p.u.u_time, t); gl.uniform1f(p.u.u_texel, 1 / MASK_N);
+    gl.uniform1f(p.u.u_time, t); gl.uniform1f(p.u.u_texel, 1 / MASK_N); gl.uniform1f(p.u.u_spout, spoutVis);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, cell.mask); gl.uniform1i(p.u.u_mask, 0);
     gl.bindBuffer(gl.ARRAY_BUFFER, buf.quad);
     gl.enableVertexAttribArray(p.a.a_xy); gl.vertexAttribPointer(p.a.a_xy, 2, gl.FLOAT, false, 0, 0);
@@ -304,10 +402,30 @@ function draw(matrix) {
       p = prog.rain;
       gl.useProgram(p.p);
       gl.uniformMatrix4fv(p.u.u_matrix, false, M); gl.uniform1f(p.u.u_mpm, mpm); gl.uniform1f(p.u.u_R, R); gl.uniform1f(p.u.u_time, t);
+      gl.uniform1f(p.u.u_spout, spoutVis);
       gl.bindBuffer(gl.ARRAY_BUFFER, buf.rain);
       gl.enableVertexAttribArray(p.a.a_seed); gl.vertexAttribPointer(p.a.a_seed, 4, gl.FLOAT, false, 0, 0);
       gl.drawArrays(gl.LINES, 0, Math.round(MAX_DROPS * k) * 2);
       gl.disableVertexAttribArray(p.a.a_seed);
+    }
+
+    // the waterspout, then its spray; the funnel hides the cloud behind it
+    if (spoutVis > 0) {
+      p = prog.spout;
+      gl.useProgram(p.p);
+      gl.uniformMatrix4fv(p.u.u_matrix, false, M); gl.uniform1f(p.u.u_mpm, mpm); gl.uniform1f(p.u.u_R, R);
+      gl.uniform1f(p.u.u_H, CLOUD_BASE + SPOUT_H * (CLOUD_TOP - CLOUD_BASE)); gl.uniform1f(p.u.u_time, t); gl.uniform1f(p.u.u_vis, spoutVis);
+      gl.uniform3f(p.u.u_eye, (cam.x - merc.x) / mpm, (merc.y - cam.y) / mpm, (cam.z - merc.z) / mpm);
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf.spout);
+      gl.enableVertexAttribArray(p.a.a_uv); gl.vertexAttribPointer(p.a.a_uv, 2, gl.FLOAT, false, 0, 0);
+      gl.uniform1f(p.u.u_part, 0);
+      gl.uniform1f(p.u.u_solid, 1); gl.depthMask(true);
+      gl.drawArrays(gl.TRIANGLES, 0, SPOUT_AROUND * SPOUT_UP * 6);
+      gl.uniform1f(p.u.u_solid, 0); gl.depthMask(false);
+      gl.drawArrays(gl.TRIANGLES, 0, SPOUT_AROUND * SPOUT_UP * 6);
+      gl.uniform1f(p.u.u_part, 1); gl.depthMask(false);
+      gl.drawArrays(gl.TRIANGLES, 0, SPOUT_AROUND * SPOUT_UP * 6);
+      gl.disableVertexAttribArray(p.a.a_uv);
     }
 
     // spiral cloud bands; thinner when tilted low or zoomed in under them, so the map stays usable
@@ -318,6 +436,8 @@ function draw(matrix) {
     const veil = Math.min(1, Math.max(0.5, 1 - (zoom - 9) * 0.15));
     gl.uniform1f(p.u.u_veil, veil);
     gl.uniform1f(p.u.u_tilt, 1 + 2.2 * Math.min(1, Math.max(0, (pitch - 40) / 40)));
+    gl.uniform1f(p.u.u_spout, spoutVis);
+    gl.uniform1f(p.u.u_eyeZ, (cam.z - merc.z) / mpm);
     gl.uniform3f(p.u.u_flash, ...flash(cell, t));
     gl.bindBuffer(gl.ARRAY_BUFFER, buf.cloud);
     gl.enableVertexAttribArray(p.a.a_pos); gl.vertexAttribPointer(p.a.a_pos, 3, gl.FLOAT, false, 0, 0);

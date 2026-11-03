@@ -1897,9 +1897,10 @@ async function fillFeed(popup, hazard, loc) {
 function dropHazard(hazard, loc, custom) {
   const el = iconChip(hazard, loc.severity, loc.name);
   // anchor 'center' pins the icon's centre to the coordinate so it stays put
-  // through zoom; opacityWhenCovered:1 stops MapLibre fading markers it thinks
-  // the 3D terrain mesh occludes (which washed out sites in valleys/on water)
-  const marker = new window.mapboxgl.Marker({ element: el, anchor: 'center', opacityWhenCovered: '1' })
+  // through zoom; occludedOpacity (Mapbox) / opacityWhenCovered (MapLibre) at 1
+  // stop the map fading markers it thinks the 3D terrain mesh occludes (which
+  // washed out sites in valleys/on water)
+  const marker = new window.mapboxgl.Marker({ element: el, anchor: 'center', occludedOpacity: 1, opacityWhenCovered: '1' })
     .setLngLat(loc.coordinates).addTo(map);
   const popup = new window.mapboxgl.Popup({ offset: 18, closeButton: true, maxWidth: '260px' })
     .setHTML(popupHTML(hazard, loc));
