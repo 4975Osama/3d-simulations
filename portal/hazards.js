@@ -81,11 +81,41 @@ function rebuild() {
   });
 }
 
+/* the camera follows the selection: switching a hazard on flies to its sites,
+   switching one off frames the hazards still shown, and switching the last
+   one off flies back to where the map was before any were picked */
+let home = null;
+function flyToSites(cats) {
+  const map = window.map;
+  if (!map || typeof map.flyTo !== 'function') return;
+  const pts = cats.flatMap((c) => (window.hazardData[c] ? window.hazardData[c].locations : [])).map((l) => l.coordinates);
+  if (!pts.length) return;
+  const bounds = pts.reduce((b, p) => b.extend(p), new window.mapboxgl.LngLatBounds(pts[0], pts[0]));
+  // extra room on the right for the map toolbar and at the bottom for the severity legend
+  const cam = map.cameraForBounds(bounds, { padding: { top: 110, bottom: 140, left: 100, right: 200 }, maxZoom: pts.length > 1 ? 9 : 10 });
+  if (!cam) return;
+  map.flyTo({ ...cam, pitch: map.getPitch(), bearing: map.getBearing(), duration: 2200, essential: true });
+}
+function flyHome() {
+  const map = window.map;
+  if (!home || !map || typeof map.flyTo !== 'function') return;
+  map.flyTo({ ...home, duration: 2200, essential: true });
+  home = null;
+}
+
 function toggleRow(year, cat, on) {
+  const map = window.map;
+  if (on && !onSet.size && !home && map && typeof map.getCenter === 'function') {
+    home = { center: map.getCenter(), zoom: map.getZoom(), pitch: map.getPitch(), bearing: map.getBearing() };
+  }
+  const wasOn = onSet.has(cat);
   if (on) picked.add(year + '|' + cat); else picked.delete(year + '|' + cat);
   onSet.clear();
   picked.forEach((k) => onSet.add(k.split('|')[1]));
   rebuild();
+  if (on) flyToSites([cat]);
+  else if (!onSet.size) flyHome();
+  else if (wasOn && !onSet.has(cat)) flyToSites([...onSet]);
 }
 
 function iconMarkup(cat) {

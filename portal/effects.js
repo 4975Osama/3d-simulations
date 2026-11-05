@@ -9,7 +9,8 @@ let map, mapboxgl;   // resolved in initFX() — effects.js must not bind them a
 // scripts can evaluate BEFORE window.map exists.
 
 // hazard types drawn by hazards3d.js, and the effect each one gets there
-const HAZARD_3D_KIND = { 'snow-emergencies': 'snow', 'glof-emergencies': 'glof', 'smog-fog': 'smog', 'heatwave': 'heat' };
+const HAZARD_3D_KIND = { 'snow-emergencies': 'snow', 'glof-emergencies': 'glof', 'smog-fog': 'smog', 'heatwave': 'heat',
+  'drought': 'drought', 'earthquake': 'quake' };
 
 class AdvancedHazardAnimationSystem {
     constructor() {
@@ -1375,51 +1376,11 @@ class AdvancedHazardAnimationSystem {
     // EARTHQUAKE ANIMATION - SEISMIC
     // ========================================
     createEarthquakeAnimation(severity) {
+        // The quake itself (waves, shaking, rupture, dust) is drawn in 3D at real
+        // size on the terrain (hazards3d.js, registered in addAnimationToMarker);
+        // this marker only tracks the site.
         const container = document.createElement('div');
-        container.className = 'hazard-animation-container earthquake-container shake-container';
-
-        // Seismic center
-        const center = document.createElement('div');
-        center.className = 'seismic-center';
-        container.appendChild(center);
-
-        // Seismic waves
-        const waveCount = severity === 'Very High' ? 6 : severity === 'High' ? 5 : 4;
-        for (let i = 0; i < waveCount; i++) {
-            const wave = document.createElement('div');
-            wave.className = 'seismic-wave-advanced';
-            wave.style.animationDelay = `${i * 0.3}s`;
-            container.appendChild(wave);
-        }
-
-        // Ground cracks
-        const crackCount = 6;
-        for (let i = 0; i < crackCount; i++) {
-            const crack = document.createElement('div');
-            crack.className = 'ground-crack';
-            crack.style.top = `${20 + i * 12}%`;
-            crack.style.left = `${10 + Math.random() * 20}%`;
-            crack.style.transform = `rotate(${-10 + Math.random() * 20}deg)`;
-            crack.style.animationDelay = `${i * 0.3}s`;
-            container.appendChild(crack);
-        }
-
-        // Debris particles
-        const debrisCount = severity === 'Very High' ? 20 : severity === 'High' ? 15 : 10;
-        for (let i = 0; i < debrisCount; i++) {
-            const debris = document.createElement('div');
-            debris.className = 'debris-particle';
-            const size = 3 + Math.random() * 8;
-            debris.style.width = `${size}px`;
-            debris.style.height = `${size * 0.7}px`;
-            debris.style.left = `${30 + Math.random() * 40}%`;
-            debris.style.top = '50%';
-            debris.style.setProperty('--debrisDrift', `${-20 + Math.random() * 40}px`);
-            debris.style.animationDuration = `${1 + Math.random() * 1}s`;
-            debris.style.animationDelay = `${Math.random() * 2}s`;
-            container.appendChild(debris);
-        }
-
+        container.className = 'hazard-animation-container earthquake-container';
         return container;
     }
 
@@ -1438,54 +1399,11 @@ class AdvancedHazardAnimationSystem {
     // DROUGHT ANIMATION - HEAT CRACK
     // ========================================
     createDroughtAnimation(severity) {
+        // The drought itself (parched, cracked ground, blowing dust, dust devils)
+        // is drawn in 3D at real size on the terrain (hazards3d.js, registered in
+        // addAnimationToMarker); this marker only tracks the site.
         const container = document.createElement('div');
         container.className = 'hazard-animation-container drought-container';
-
-        // Dry ground
-        const ground = document.createElement('div');
-        ground.className = 'dry-ground';
-        container.appendChild(ground);
-
-        // Heat wave layers
-        for (let i = 0; i < 4; i++) {
-            const heatLayer = document.createElement('div');
-            heatLayer.className = 'heat-wave-layer';
-            heatLayer.style.animationDelay = `${i * 0.5}s`;
-            container.appendChild(heatLayer);
-        }
-
-        // Drought cracks
-        const crackCount = severity === 'Very High' ? 8 : severity === 'High' ? 6 : 4;
-        for (let i = 0; i < crackCount; i++) {
-            const crack = document.createElement('div');
-            crack.className = 'drought-crack';
-            crack.style.left = `${5 + Math.random() * 30}%`;
-            crack.style.top = `${40 + Math.random() * 40}%`;
-            crack.style.transform = `rotate(${-30 + Math.random() * 60}deg)`;
-            crack.style.animationDelay = `${Math.random() * 2}s`;
-            container.appendChild(crack);
-        }
-
-        // Heat shimmer particles
-        for (let i = 0; i < 10; i++) {
-            const shimmer = document.createElement('div');
-            shimmer.className = 'heat-shimmer-particle';
-            shimmer.style.left = `${10 + Math.random() * 80}%`;
-            shimmer.style.bottom = `${30 + Math.random() * 30}%`;
-            shimmer.style.animationDelay = `${Math.random() * 3}s`;
-            container.appendChild(shimmer);
-        }
-
-        // Wilted plants
-        for (let i = 0; i < 5; i++) {
-            const plant = document.createElement('div');
-            plant.className = 'wilted-plant';
-            plant.style.left = `${15 + i * 18}%`;
-            plant.style.bottom = '25%';
-            plant.style.animationDelay = `${i * 0.5}s`;
-            container.appendChild(plant);
-        }
-
         return container;
     }
 
@@ -1614,8 +1532,8 @@ class AdvancedHazardAnimationSystem {
             this.activeAnimations.delete(hazardType);
             if (hazardType === 'floods') window.storm3d?.clearCells();
             if (hazardType === 'fire-emergencies') window.fire3d?.clearCells();
-            if (hazardType === 'landslide-mudslide') window.landslide3d?.clearCells();
             if (hazardType === 'coastal-emergencies') window.coastal3d?.clearCells();
+            if (hazardType === 'landslide-mudslide') window.landslide3d?.clearCells();
             if (HAZARD_3D_KIND[hazardType]) window.hazards3d?.clearCells(HAZARD_3D_KIND[hazardType]);
         }
     }
@@ -1636,8 +1554,8 @@ class AdvancedHazardAnimationSystem {
         this.activeAnimations.clear();
         window.storm3d?.clearCells();
         window.fire3d?.clearCells();
-        window.landslide3d?.clearCells();
         window.coastal3d?.clearCells();
+        window.landslide3d?.clearCells();
         window.hazards3d?.clearCells();
     }
 }

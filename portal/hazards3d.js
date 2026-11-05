@@ -1,9 +1,12 @@
-/* 3D effects for four more hazard types, drawn in world space by one Mapbox
+/* 3D effects for six more hazard types, drawn in world space by one Mapbox
    custom layer (like storm3d.js / fire3d.js / landslide3d.js / coastal3d.js),
    at real size on the terrain:
 
-   - snow:  snowfall from a low cloud deck, flakes drifting and swaying in the
-            wind, a snow blanket on the ground and blowing snow along it
+   - snow:  snow lying on the real land: deepest up high and on gentle ground,
+            thin in the valleys, sliding off steep slopes (worked out from the
+            terrain), blue in shadow, forests dusted rather than buried; flakes
+            falling and swaying, snow blowing along the ground, and the haze of
+            falling snow into the distance
    - glof:  a glacial lake bursting: silty meltwater racing down the real
             valley (traced downhill over the terrain), white foam and spray
    - smog:  a thick, low brown-grey haze lying over the city and drifting
@@ -12,6 +15,15 @@
             population grid: the urban heat island; cooler up the hills and
             over the sea), the land seen through wavering heat shimmer, and
             sun-baked light with a hot dusty haze thickening into the distance
+   - drought: the land parched (green fields dried to tan and brown), cracked
+            like a dried mud bed (the crack network at three scales, so it
+            reads at every zoom), dust blowing across it in sheets, dust devils
+            whirling up when the map is tilted, a dusty haze into the distance
+   - quake: an earthquake on a loop: rupture at the epicentre, P waves (6 km/s)
+            then the stronger S waves (3.5 km/s, real speeds, time-lapsed) run
+            out as rings, shaking and rolling the land itself as they pass and
+            dying away with distance, over a ShakeMap-style intensity field; the
+            surface rupture tears open along the fault, and dust is thrown up
 
    setCells([{ id, kind, lngLat, severity }]) puts one effect on each site
    (effects.js registers them). Sizes are in metres and every particle is
@@ -21,23 +33,31 @@ let map = null;
 const LAYER_ID = 'hazards3d';
 const PATH_N = 48;
 const KIND = {
-  snow: { minZoom: 8, R: { 'Very High': 8000, High: 6000, Medium: 4000, Low: 3000 } },
+  snow: { minZoom: 7.5, R: { 'Very High': 15000, High: 11000, Medium: 8000, Low: 5000 } },
   glof: { minZoom: 8, R: { 'Very High': 12000, High: 8000, Medium: 6000, Low: 4000 } },   // R = flood length
   smog: { minZoom: 6.5, R: { 'Very High': 25000, High: 18000, Medium: 12000, Low: 8000 } },
   heat: { minZoom: 5.5, R: { 'Very High': 30000, High: 22000, Medium: 15000, Low: 10000 } },
+  drought: { minZoom: 5.5, R: { 'Very High': 45000, High: 35000, Medium: 25000, Low: 15000 } },
+  quake: { minZoom: 6, R: { 'Very High': 40000, High: 30000, Medium: 20000, Low: 12000 } },   // R = strong-shaking radius
 };
 const SHARE = { 'Very High': 1, High: 0.8, Medium: 0.6, Low: 0.45 };
 // particle kinds (u_kind) and counts at full severity
 const P = {
-  flake: 0, snowGround: 1, drift: 2, water: 3, spray: 4, lake: 5, smog: 6, snowCloud: 9,
+  flake: 0, drift: 2, water: 3, spray: 4, lake: 5, smog: 6,
+  dust: 10, devil: 11, quakeDust: 12,
 };
 const COUNTS = {
-  snow: { [P.snowCloud]: 110, [P.snowGround]: 1100, [P.drift]: 200, [P.flake]: 8000 },
+  snow: { [P.drift]: 260, [P.flake]: 12000 },  // plus a terrain mesh (the snow cover)
   glof: { [P.lake]: 70, [P.water]: 1100, [P.spray]: 520 },
   smog: { [P.smog]: 1100 },
   heat: {},                          // a terrain mesh, not particles (see heatMesh)
+  drought: { [P.dust]: 260, [P.devil]: 14 },   // plus a terrain mesh (cracked, parched ground)
+  quake: { [P.quakeDust]: 240 },               // plus a terrain mesh (waves, shaking, rupture)
 };
-const SNOW_H = 1600, SNOW_CLOUD_H = 1900, WIND = [0.6, 0.25];
+const SNOW_H = 1600, WIND = [0.6, 0.25];
+const QUAKE_T = 16;                // seconds between ruptures (the loop)
+const QUAKE_VP = 6000, QUAKE_VS = 3500;        // P and S wave speeds in the crust, m/s
+const FAULT_STRIKE = 330;          // fault bearing (°): the Himalayan frontal thrusts run NNW-SSE here
 
 const state = { cells: [] };
 
@@ -48,7 +68,7 @@ attribute vec3 a_base;               // ground spot (local m, z = ground height)
 attribute vec4 a_seed;
 attribute vec2 a_corner;             // -1..1
 uniform mat4 u_matrix;
-uniform float u_mpm, u_time, u_focal, u_kind, u_minpx, u_width;
+uniform float u_mpm, u_time, u_focal, u_kind, u_minpx, u_width, u_T;
 uniform vec3 u_eye;
 uniform vec2 u_half, u_wind;
 uniform vec3 u_path[${PATH_N}];
@@ -74,18 +94,12 @@ void main() {
     float h = ${SNOW_H.toFixed(1)} * (1.0 - f);
     p += vec3(u_wind * (1.0 - f) * 500.0 + vec2(sin(u_time * 1.3 + s4 * 30.0), cos(u_time * 1.1 + s3 * 30.0)) * 14.0, h + 3.0);
     size = 7.0 + 9.0 * s4;
-    alpha = smoothstep(0.0, 0.08, f) * smoothstep(1.0, 0.94, f);
-  } else if (isKind(${P.snowGround}.0)) {              // snow blanket
-    onGround = true; size = 220.0 + 260.0 * s2; p.z += 4.0; alpha = 0.42;
+    alpha = smoothstep(0.0, 0.08, f) * smoothstep(1.0, 0.94, f) * 0.9;
   } else if (isKind(${P.drift}.0)) {                    // blowing snow skimming the ground
     float f = fract(s1 + u_time * 0.07);
     p += vec3(u_wind * f * 700.0, 15.0 + 25.0 * s2);
     size = 70.0 + 110.0 * s4;
     alpha = sin(3.14159 * f) * 0.28;
-  } else if (isKind(${P.snowCloud}.0)) {               // low snow cloud deck
-    onGround = true; size = 900.0 + 900.0 * s2;
-    p.z = ${SNOW_CLOUD_H.toFixed(1)} + 200.0 * s3;
-    alpha = 0.45;
   } else if (isKind(${P.water}.0) || isKind(${P.spray}.0)) {   // GLOF flood water racing down the valley
     float speed = isKind(${P.water}.0) ? 0.035 + 0.02 * s2 : 0.05 + 0.03 * s2;
     float t = fract(s1 + u_time * speed);
@@ -112,6 +126,23 @@ void main() {
     p += vec3(u_wind * mod(drift + s4 * 3000.0, 3000.0) - u_wind * 1500.0, 60.0 + 320.0 * s2);
     size = 900.0 + 1500.0 * s4;
     alpha = 0.34 + 0.1 * sin(u_time * 0.2 + s1 * 20.0);
+  } else if (isKind(${P.dust}.0)) {                     // drought: sheets of dust blown low across the land
+    float f = fract(s1 + u_time / (70.0 + 60.0 * s2));
+    p += vec3(u_wind * (f - 0.5) * 5000.0, 20.0 + 140.0 * s2);
+    size = 400.0 + 700.0 * s4;
+    alpha = sin(3.14159 * f) * 0.3;
+  } else if (isKind(${P.devil}.0)) {                    // drought: a dust devil whirling up, wandering downwind
+    float f = fract(s1 + u_time / (24.0 + 16.0 * s2));
+    size = 60.0 + 70.0 * s4; aspect = 5.0;
+    p += vec3(u_wind * f * 1800.0 + vec2(cos(u_time * 0.7 + s3 * 9.0), sin(u_time * 0.9 + s3 * 9.0)) * 60.0, size * aspect);
+    alpha = sin(3.14159 * f) * 0.6;
+    vec3 vd = normalize(p - u_eye);
+    alpha *= smoothstep(0.85, 0.5, abs(vd.z));          // a column: only reads when looking across the land
+  } else if (isKind(${P.quakeDust}.0)) {                // quake: dust thrown up as the S waves pass
+    float e = mod(u_time, u_T) - length(a_base.xy) / ${QUAKE_VS.toFixed(1)} - s2 * 0.6;
+    p.z += 30.0 + 420.0 * (1.0 - exp(-max(e, 0.0) * 0.35));
+    size = (150.0 + 300.0 * s4) * (1.0 + 0.25 * max(e, 0.0));
+    alpha = step(0.0, e) * smoothstep(0.0, 0.6, e) * exp(-max(e, 0.0) * 0.3) * 0.55;
   }
   float dist = max(length(p - u_eye), 1.0);
   if (onGround) {
@@ -124,7 +155,9 @@ void main() {
   } else {
     p.z += dist * 0.003;
     vec4 c = u_matrix * vec4(p.x * u_mpm, -p.y * u_mpm, p.z * u_mpm, 1.0);
-    float px = max(size * u_focal / dist, u_minpx);
+    float raw = size * u_focal / dist, px = max(raw, u_minpx);
+    // far-off snowflakes too small to see fade out instead of speckling the map
+    if (isKind(${P.flake}.0)) alpha *= smoothstep(0.5, 2.2, raw);
     c.xy += a_corner * vec2(px, px * aspect) / u_half * c.w;
     gl_Position = c;
   }
@@ -148,9 +181,7 @@ void main() {
   float soft = pow(max(0.0, 1.0 - r * r), 2.0);
   float n = vnoise(uv * 2.5 + v_shade * 19.0);
   if (isKind(${P.flake}.0)) { a = smoothstep(1.0, 0.2, r); col = vec3(0.97, 0.98, 1.0); }
-  else if (isKind(${P.snowGround}.0)) { a = smoothstep(1.0, 0.4, r + (n - 0.5) * 0.5); col = mix(vec3(0.86, 0.89, 0.93), vec3(0.98, 0.99, 1.0), n); }
   else if (isKind(${P.drift}.0)) { a = soft * n; col = vec3(0.93, 0.95, 0.98); }
-  else if (isKind(${P.snowCloud}.0)) { a = soft * smoothstep(0.25, 0.75, n); col = mix(vec3(0.62, 0.65, 0.70), vec3(0.88, 0.9, 0.93), n); }
   else if (isKind(${P.water}.0)) {
     // silty glacial meltwater, white where it churns
     a = smoothstep(1.0, 0.5, r + (n - 0.5) * 0.4);
@@ -160,6 +191,15 @@ void main() {
   else if (isKind(${P.spray}.0)) { a = soft * 0.9; col = vec3(0.92, 0.95, 0.97); }
   else if (isKind(${P.lake}.0)) { a = smoothstep(1.0, 0.5, r + (n - 0.5) * 0.4); col = mix(vec3(0.18, 0.55, 0.62), vec3(0.42, 0.75, 0.78), n); }
   else if (isKind(${P.smog}.0)) { a = soft * (0.65 + 0.35 * n); col = mix(vec3(0.50, 0.47, 0.40), vec3(0.66, 0.63, 0.56), n); }   // brown-grey murk
+  else if (isKind(${P.dust}.0)) { a = soft * smoothstep(0.2, 0.8, n); col = mix(vec3(0.70, 0.58, 0.42), vec3(0.84, 0.74, 0.58), n); }   // tan dust
+  else if (isKind(${P.devil}.0)) {
+    // a funnel of dust: narrow at the ground, spreading upwards, banded as it spins
+    float w = 0.3 + 0.7 * (uv.y * 0.5 + 0.5);
+    float spin = 0.6 + 0.4 * sin(uv.y * 12.0 - u_time * 7.0 + uv.x * 4.0 + v_shade * 20.0);
+    a = smoothstep(1.0, 0.25, abs(uv.x) / w) * smoothstep(1.0, 0.55, abs(uv.y)) * spin * (0.6 + 0.4 * n);
+    col = mix(vec3(0.62, 0.50, 0.36), vec3(0.82, 0.71, 0.55), n);
+  }
+  else if (isKind(${P.quakeDust}.0)) { a = soft * (0.55 + 0.45 * n); col = mix(vec3(0.56, 0.50, 0.43), vec3(0.74, 0.69, 0.61), n); }   // grey-brown dust
   a *= v_alpha * u_fade;
   gl_FragColor = vec4(col * a, a);
 }`;
@@ -169,16 +209,19 @@ void main() {
 // the sun, hazy with distance, tinted by how hot the ground is
 const HEAT_VS = `
 precision highp float;
-attribute vec4 a_pos;                // x, y (m east/north of the site), z (m above it, exaggerated), heat 0..1
+attribute vec4 a_pos;                // x, y (m east/north of the site), z (m above it, exaggerated), value 0..1
+attribute vec2 a_aux;                // per effect (snow: the snowfall region)
 uniform mat4 u_matrix;
 uniform float u_mpm;
 uniform vec3 u_eye;
 varying vec3 v_w;
 varying float v_heat;
+varying vec2 v_aux;
 void main() {
   vec3 p = a_pos.xyz;
   v_w = p;
   v_heat = a_pos.w;
+  v_aux = a_aux;
   p.z += 2.0 + max(length(p - u_eye), 1.0) * 0.003;   // coarse far terrain must not swallow it
   gl_Position = u_matrix * vec4(p.x * u_mpm, -p.y * u_mpm, p.z * u_mpm, 1.0);
 }`;
@@ -242,8 +285,199 @@ void main() {
   }
 }`;
 
+const GROUND_NOISE = `
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+vec2 hash22(vec2 p) { return fract(sin(vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)))) * 43758.5453); }
+float vnoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
+}
+float fbm(vec2 p) { float v = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { v += a * vnoise(p); p *= 2.03; a *= 0.5; } return v; }
+vec3 overlay(vec3 b, vec3 c) { return mix(2.0 * b * c, 1.0 - 2.0 * (1.0 - b) * (1.0 - c), step(0.5, b)); }`;
+
+// drought: v_heat carries how dry the ground is (0..1)
+const DROUGHT_FS = `
+precision highp float;
+uniform sampler2D u_scene;
+uniform float u_hasScene, u_time, u_fade, u_dpr, u_tilt, u_close, u_pxAng;
+uniform vec4 u_vp;
+uniform vec3 u_eye;
+uniform vec2 u_wind;
+varying vec3 v_w;
+varying float v_heat;
+${GROUND_NOISE}
+// a dried mud bed: the gaps between irregular clay plates (cellular noise, F2 - F1)
+float plates(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  float d1 = 8.0, d2 = 8.0;
+  for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+    vec2 g = vec2(float(x), float(y));
+    float d = length(g + hash22(i + g) * 0.85 + 0.075 - f);
+    if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) { d2 = d; }
+  }
+  return d2 - d1;                                    // 0 on a crack, growing into the plate
+}
+// one scale of cracks: cell size S metres, drawn only while the cells are big enough on screen
+float crackLayer(vec2 w, float S, float mpx, float seed) {
+  float px = S / mpx;                                // cell size on screen
+  float vis = smoothstep(7.0, 16.0, px) * (1.0 - 0.75 * smoothstep(220.0, 700.0, px));
+  if (vis <= 0.0) return 0.0;
+  float width = max(1.3 * mpx, S * 0.012) / S;
+  return (1.0 - smoothstep(0.0, width, plates(w / S + seed))) * vis;
+}
+// drought-monitor colours: abnormally dry yellow to exceptional deep brown
+vec3 droughtCol(float d) {
+  vec3 c = mix(vec3(0.99, 0.88, 0.50), vec3(0.93, 0.62, 0.22), smoothstep(0.15, 0.5, d));
+  return mix(c, vec3(0.48, 0.24, 0.10), smoothstep(0.5, 1.0, d));
+}
+void main() {
+  float mask = smoothstep(0.0, 0.14, v_heat) * u_fade;
+  if (mask < 0.003) discard;
+  vec2 km = v_w.xy / 1000.0;
+  float dry = clamp(v_heat * (0.85 + 0.3 * fbm(km * 0.25 + 3.0)), 0.0, 1.0);
+  vec3 view = v_w - u_eye;
+  float dist = length(view);
+  float graze = 1.0 - abs(view.z) / dist;
+  float mpx = dist * u_pxAng;                        // metres per device pixel here
+  // the cracks: big polygons (dried reservoir beds), field-sized, and the fine mud crazing up close
+  float patchy = smoothstep(0.35, 0.75, dry * (0.7 + 0.6 * fbm(km * 0.6 + 7.0)));
+  float lines = max(max(crackLayer(v_w.xy, 900.0, mpx, 0.0), crackLayer(v_w.xy, 180.0, mpx, 17.0) * 0.85),
+                    crackLayer(v_w.xy, 36.0, mpx, 41.0) * 0.7) * patchy;
+  // blowing dust and a dusty haze into the distance
+  float blow = smoothstep(0.5, 0.9, fbm(km * 0.7 - u_wind * u_time * 0.05)) * dry * (0.12 + 0.3 * graze);
+  float haze = smoothstep(2500.0, 40000.0, dist) * (0.3 + 0.7 * graze) * smoothstep(0.1, 0.6, dry) * 0.5;
+  vec3 dustCol = vec3(0.80, 0.69, 0.52);
+  float tintA = (0.12 + 0.2 * smoothstep(0.2, 1.0, dry)) * mix(1.0, 0.5, u_tilt) * mix(1.0, 0.25, u_close);
+  if (u_hasScene > 0.5) {
+    vec3 scene = texture2D(u_scene, (gl_FragCoord.xy - u_vp.xy) / u_vp.zw).rgb;
+    // parched: the green drains out of the fields, the land turns tan and brown
+    float l = dot(scene, vec3(0.30, 0.59, 0.11));
+    vec3 parched = vec3(l * 1.08 + 0.07, l * 0.93 + 0.045, l * 0.70 + 0.01);
+    vec3 col = mix(scene, parched, 0.85 * smoothstep(0.05, 0.7, dry));
+    col = mix(col, overlay(col, droughtCol(dry)), clamp(tintA * 2.0, 0.0, 1.0));
+    col = mix(col, col * 0.28, lines * 0.9);         // dark, shadowed cracks
+    col = mix(col, dustCol, max(blow, haze));
+    gl_FragColor = vec4(col * mask, mask);
+  } else {
+    vec4 c = vec4(droughtCol(dry), tintA);
+    c = mix(c, vec4(0.18, 0.12, 0.08, 0.8), lines * 0.9);
+    c = mix(c, vec4(dustCol, 0.6), max(blow, haze));
+    gl_FragColor = vec4(c.rgb * c.a, c.a) * mask;
+  }
+}`;
+
+// earthquake: v_heat is just the edge of the shaking zone; everything else follows
+// from the distance to the epicentre and the time since the rupture
+const QUAKE_FS = `
+precision highp float;
+uniform sampler2D u_scene;
+uniform float u_hasScene, u_time, u_fade, u_dpr, u_tilt, u_close, u_pxAng, u_R, u_T, u_len;
+uniform vec4 u_vp;
+uniform vec3 u_eye;
+uniform vec2 u_strike;               // fault direction (x east, y north)
+varying vec3 v_w;
+varying float v_heat;
+${GROUND_NOISE}
+// ShakeMap intensity colours: light felt shaking blue-green, to yellow, orange, red, violent dark red
+vec3 shakeCol(float i) {
+  vec3 c = mix(vec3(0.55, 0.85, 0.95), vec3(0.55, 0.95, 0.55), smoothstep(0.0, 0.25, i));
+  c = mix(c, vec3(1.0, 0.92, 0.25), smoothstep(0.25, 0.5, i));
+  c = mix(c, vec3(1.0, 0.55, 0.10), smoothstep(0.5, 0.7, i));
+  c = mix(c, vec3(0.88, 0.12, 0.06), smoothstep(0.7, 0.88, i));
+  return mix(c, vec3(0.55, 0.03, 0.05), smoothstep(0.88, 1.0, i));
+}
+void main() {
+  float mask = smoothstep(0.0, 0.14, v_heat) * u_fade;
+  if (mask < 0.003) discard;
+  vec2 xy = v_w.xy;
+  float d = length(xy);
+  vec3 view = v_w - u_eye;
+  float dist = length(view);
+  float mpx = dist * u_pxAng;
+  float ph = mod(u_time, u_T);                       // seconds since the rupture
+  // how hard the ground shakes, falling off with distance (geometric spreading)
+  float atten = 1.0 / (1.0 + d / (0.12 * u_R));
+  float intensity = clamp(1.0 - log(1.0 + d / (0.04 * u_R)) / log(1.0 + 1.0 / 0.04), 0.0, 1.0);
+  float tP = ph - d / ${QUAKE_VP.toFixed(1)}, tS = ph - d / ${QUAKE_VS.toFixed(1)};
+  float shakeP = step(0.0, tP) * exp(-tP * 1.4) * 0.35;
+  float shakeS = step(0.0, tS) * exp(-tS * 0.5);
+  float shake = (shakeP + shakeS) * atten;
+  // the wave fronts: thin bright rings, with the ground rolling in ripples behind the S front
+  float w = max(0.012 * u_R, 4.0 * mpx);
+  float frontP = exp(-pow((ph * ${QUAKE_VP.toFixed(1)} - d) / w, 2.0)) * 0.45;
+  float frontS = exp(-pow((ph * ${QUAKE_VS.toFixed(1)} - d) / (w * 1.4), 2.0));
+  float fade = 1.0 - smoothstep(0.6, 1.0, ph / u_T);  // the last waves die out before the next rupture
+  float rings = (frontP + frontS) * sqrt(atten) * fade;
+  float roll = sin((d - ph * ${QUAKE_VS.toFixed(1)}) / (0.05 * u_R) * 6.2832) * shakeS * atten;
+  // the surface rupture: a jagged tear along the fault, opening outwards from the epicentre at ~2.8 km/s
+  vec2 across = vec2(u_strike.y, -u_strike.x);
+  float along = dot(xy, u_strike);
+  float off = dot(xy, across) - (fbm(vec2(along / 4000.0, 3.0)) - 0.5) * 0.03 * u_R;
+  float reach = min(u_len, ph * 2800.0 + 2000.0);
+  float tear = (1.0 - smoothstep(0.0, max(0.002 * u_R, 1.8 * mpx), abs(off))) * (1.0 - smoothstep(reach * 0.85, reach, abs(along)));
+  tear *= 0.6 + 0.4 * smoothstep(0.3, 0.7, fbm(vec2(along / 900.0, 9.0)));
+  // the epicentre flashes at the rupture
+  float core = exp(-d / (0.025 * u_R)) * (0.35 + 0.65 * exp(-ph * 0.8));
+  vec3 ringCol = vec3(1.0, 0.62, 0.18);
+  float mapA = (0.16 + 0.22 * shake) * mix(1.0, 0.55, u_tilt) * mix(1.0, 0.4, u_close);
+  if (u_hasScene > 0.5) {
+    // the land itself shakes (jolted every which way) and rolls as the waves pass
+    vec2 jolt = vec2(sin(u_time * 37.0 + d * 0.0021), cos(u_time * 29.0 + d * 0.0017)) * shake * 6.0;
+    vec2 offPx = (jolt + vec2(0.0, roll * 5.0)) * u_dpr;
+    vec3 col = texture2D(u_scene, clamp((gl_FragCoord.xy - u_vp.xy + offPx) / u_vp.zw, vec2(0.001), vec2(0.999))).rgb;
+    col = mix(col, overlay(col, shakeCol(intensity)), clamp(mapA * 2.0, 0.0, 1.0));
+    col += ringCol * rings * 0.55 + vec3(1.0, 0.35, 0.15) * core * 0.6;
+    col = mix(col, vec3(0.10, 0.07, 0.05) + vec3(0.5, 0.12, 0.04) * shake, tear * 0.92);
+    gl_FragColor = vec4(col * mask, mask);
+  } else {
+    float a = clamp(mapA + rings * 0.5 + core * 0.5, 0.0, 1.0);
+    vec3 col = (shakeCol(intensity) * mapA + ringCol * rings * 0.5 + vec3(1.0, 0.35, 0.15) * core * 0.5) / max(a, 1e-3);
+    vec4 c = mix(vec4(col, a), vec4(0.10, 0.07, 0.05, 0.9), tear * 0.92);
+    gl_FragColor = vec4(c.rgb * c.a, c.a) * mask;
+  }
+}`;
+
+// snow: v_heat is how deep the snow lies (0..1), v_aux.x the snowfall region
+const SNOW_FS = `
+precision highp float;
+uniform sampler2D u_scene;
+uniform float u_hasScene, u_time, u_fade, u_tilt, u_close;
+uniform vec4 u_vp;
+uniform vec3 u_eye;
+varying vec3 v_w;
+varying float v_heat;
+varying vec2 v_aux;
+${GROUND_NOISE}
+void main() {
+  float mask = smoothstep(0.0, 0.12, v_aux.x) * u_fade;
+  if (mask < 0.003) discard;
+  vec2 km = v_w.xy / 1000.0;
+  vec3 view = v_w - u_eye;
+  float dist = length(view);
+  float graze = 1.0 - abs(view.z) / dist;
+  // patchy where it lies thin, unbroken where it is deep
+  float cover = smoothstep(0.12, 0.55, v_heat + (fbm(km * 6.0) - 0.5) * 0.35 + (fbm(km * 40.0) - 0.5) * 0.12);
+  // the haze of falling snow: the distance greys out
+  float haze = smoothstep(800.0, 16000.0, dist) * (0.3 + 0.7 * graze) * 0.5 * smoothstep(0.1, 0.5, v_aux.x);
+  vec3 hazeCol = vec3(0.84, 0.87, 0.92);
+  if (u_hasScene > 0.5) {
+    vec3 scene = texture2D(u_scene, (gl_FragCoord.xy - u_vp.xy) / u_vp.zw).rgb;
+    float l = dot(scene, vec3(0.30, 0.59, 0.11));
+    // the land's own light and shade show on the snow: blue in shadow, bright where the sun falls
+    vec3 snow = mix(vec3(0.62, 0.69, 0.82), vec3(0.97, 0.98, 1.0), smoothstep(0.06, 0.45, l));
+    // dark forest keeps showing through, dusted white
+    float trees = (1.0 - smoothstep(0.08, 0.22, l)) * smoothstep(-0.02, 0.05, scene.g - scene.r);
+    vec3 col = mix(scene, snow, cover * (1.0 - 0.5 * trees));
+    col = mix(col, hazeCol, haze);
+    gl_FragColor = vec4(col * mask, mask);
+  } else {
+    float a = max(cover * 0.85, haze);
+    gl_FragColor = vec4(mix(vec3(0.95, 0.97, 1.0), hazeCol, haze) * a, a) * mask;
+  }
+}`;
+
 /* ---------------------------------------------------------------- GL */
-let gl = null, prog = null, heat = null;
+let gl = null, prog = null, groundFx = null;
 function compile(src, type) {
   const s = gl.createShader(type);
   gl.shaderSource(s, src); gl.compileShader(s);
@@ -262,18 +496,24 @@ function setup(context) {
   const u = {}, n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
   for (let i = 0; i < n; i++) { const name = gl.getActiveUniform(p, i).name; u[name.replace(/\[0\]$/, '')] = gl.getUniformLocation(p, name); }
   prog = { p, u, a: { base: gl.getAttribLocation(p, 'a_base'), seed: gl.getAttribLocation(p, 'a_seed'), corner: gl.getAttribLocation(p, 'a_corner') } };
-  const hp = gl.createProgram();
-  gl.attachShader(hp, compile(HEAT_VS, gl.VERTEX_SHADER)); gl.attachShader(hp, compile(HEAT_FS, gl.FRAGMENT_SHADER));
-  gl.linkProgram(hp);
-  if (!gl.getProgramParameter(hp, gl.LINK_STATUS)) throw new Error('[hazards3d] ' + gl.getProgramInfoLog(hp));
-  const hu = {}, hn = gl.getProgramParameter(hp, gl.ACTIVE_UNIFORMS);
-  for (let i = 0; i < hn; i++) { const name = gl.getActiveUniform(hp, i).name; hu[name] = gl.getUniformLocation(hp, name); }
-  heat = { p: hp, u: hu, a: gl.getAttribLocation(hp, 'a_pos') };
+  // the ground effects share the terrain-mesh vertex shader
+  const groundProgram = (fs) => {
+    const gp = gl.createProgram();
+    gl.attachShader(gp, compile(HEAT_VS, gl.VERTEX_SHADER)); gl.attachShader(gp, compile(fs, gl.FRAGMENT_SHADER));
+    gl.linkProgram(gp);
+    if (!gl.getProgramParameter(gp, gl.LINK_STATUS)) throw new Error('[hazards3d] ' + gl.getProgramInfoLog(gp));
+    const gu = {}, gn = gl.getProgramParameter(gp, gl.ACTIVE_UNIFORMS);
+    for (let i = 0; i < gn; i++) { const name = gl.getActiveUniform(gp, i).name; gu[name] = gl.getUniformLocation(gp, name); }
+    return { p: gp, u: gu, a: gl.getAttribLocation(gp, 'a_pos'), aux: gl.getAttribLocation(gp, 'a_aux') };
+  };
+  groundFx = {
+    heat: groundProgram(HEAT_FS), drought: groundProgram(DROUGHT_FS), quake: groundProgram(QUAKE_FS), snow: groundProgram(SNOW_FS),
+  };
   Object.assign(scene, { tex: null, fb: null, mode: 'copy', checks: 0 });
   state.cells.forEach((c) => { c.buffers = null; c.mesh = null; });
 }
 function onRemove() {
-  gl = null; prog = null; heat = null;
+  gl = null; prog = null; groundFx = null;
   Object.assign(scene, { tex: null, fb: null });
   state.cells.forEach((c) => { c.buffers = null; c.mesh = null; });
 }
@@ -358,10 +598,15 @@ const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a
    population: the urban heat island). The heat falls off up the hills (the air
    cools about 6.5 °C per km of height) and stays low over the sea */
 const HEAT_N = 150, REGION = 3;
-function heatMesh(cell, R, k, at) {
+/* a grid lying on the terrain over a square of half-size `half`, carrying
+   value(x, y, r, er, r0) at each point (r: distance / R, er: real height here,
+   r0: real height at the site): a number, or { v, a, b } where a/b go to the
+   shader as v_aux. adjust(grid, step) may rework the values first; cells with
+   nothing in them are dropped (auxKeeps: unless their a is set) */
+function terrainMesh(cell, R, half, at, value, { adjust, auxKeeps = false } = {}) {
   const mx = 111320 * Math.cos((cell.lngLat[1] * Math.PI) / 180), my = 110540;
   const real = (x, y) => map.queryTerrainElevation([cell.lngLat[0] + x / mx, cell.lngLat[1] + y / my], { exaggerated: false });
-  const e0 = at(0, 0), r0 = real(0, 0) ?? 0, half = R * REGION * 1.05, step = (2 * half) / HEAT_N, seed = cell.phase;
+  const e0 = at(0, 0), r0 = real(0, 0) ?? 0, step = (2 * half) / HEAT_N;
   // the map's height exaggeration, so each point needs one terrain lookup, not two
   const ratio = e0 != null && r0 > 5 ? e0 / r0 : null;
   const grid = [];
@@ -371,32 +616,86 @@ function heatMesh(cell, R, k, at) {
       const x = -half + i * step, y = -half + j * step;
       const er = real(x, y), e = ratio ? (er == null ? null : er * ratio) : at(x, y);
       if (e == null || er == null) missing = true;
-      const r = Math.hypot(x, y) / R;
-      const region = 1 - smooth(0.3, 1.0, r / REGION + (fbm2(x / R * 0.8 + seed, y / R * 0.8) - 0.5) * 0.45);
-      const city = 1 - smooth(0.1, 1.0, r + (fbm2(x / R * 2.4 + seed + 7, y / R * 2.4) - 0.5) * 0.5);
-      let h = 0;
-      if (region > 0 || city > 0) {
-        const d = popDensity(cell.lngLat[0] + x / mx, cell.lngLat[1] + y / my);
-        const urban = Math.min(1, Math.log10(1 + d) / Math.log10(1 + 15000));
-        h = Math.min(1, region * 0.34 + city * (0.25 + 0.5 * urban));
-        h *= Math.min(1, Math.max(0.3, 1 - Math.max(0, (er ?? r0) - r0) / 1500));
-        if (er != null && er <= 0.5) h *= 0.25;
-        h *= 0.55 + 0.45 * k;
-      }
-      grid.push([x, y, (e ?? e0) - e0, Math.max(0, h)]);
+      let out = value(x, y, Math.hypot(x, y) / R, er, r0);
+      if (typeof out === 'number') out = { v: out };
+      grid.push([x, y, (e ?? e0) - e0, Math.max(0, out.v), out.a || 0, out.b || 0, er ?? r0]);
     }
   }
+  if (adjust) adjust(grid, step);
+  // the grid is coarser than the terrain: lift each point to the highest ground
+  // around it so steep ridges between the points can't poke through (the effects
+  // redraw what is under them on screen, so riding a little high over a valley is harmless)
+  const top = grid.map((g, idx) => {
+    const i = idx % (HEAT_N + 1), j = (idx - i) / (HEAT_N + 1);
+    let z = g[2];
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+      const n = grid[(j + dj) * (HEAT_N + 1) + i + di];
+      if (n && i + di >= 0 && i + di <= HEAT_N) z = Math.max(z, n[2]);
+    }
+    return z;
+  });
+  grid.forEach((g, idx) => { g[2] = top[idx]; });
   const tris = [];
   for (let j = 0; j < HEAT_N; j++) {
     for (let i = 0; i < HEAT_N; i++) {
       const a = grid[j * (HEAT_N + 1) + i], b = grid[j * (HEAT_N + 1) + i + 1];
       const c = grid[(j + 1) * (HEAT_N + 1) + i], d = grid[(j + 1) * (HEAT_N + 1) + i + 1];
-      if (Math.max(a[3], b[3], c[3], d[3]) < 0.005) continue;
+      if (Math.max(a[3], b[3], c[3], d[3]) < 0.005 && !(auxKeeps && Math.max(a[4], b[4], c[4], d[4]) >= 0.005)) continue;
       tris.push(a, b, d, a, d, c);
     }
   }
-  return { verts: new Float32Array(tris.flat()), missing };
+  const verts = new Float32Array(tris.length * 6);
+  tris.forEach((g, k) => verts.set(g.slice(0, 6), k * 6));
+  return { verts, missing };
 }
+function heatMesh(cell, R, k, at) {
+  const mx = 111320 * Math.cos((cell.lngLat[1] * Math.PI) / 180), my = 110540, seed = cell.phase;
+  return terrainMesh(cell, R, R * REGION * 1.05, at, (x, y, r, er, r0) => {
+    const region = 1 - smooth(0.3, 1.0, r / REGION + (fbm2(x / R * 0.8 + seed, y / R * 0.8) - 0.5) * 0.45);
+    const city = 1 - smooth(0.1, 1.0, r + (fbm2(x / R * 2.4 + seed + 7, y / R * 2.4) - 0.5) * 0.5);
+    if (region <= 0 && city <= 0) return 0;
+    const d = popDensity(cell.lngLat[0] + x / mx, cell.lngLat[1] + y / my);
+    const urban = Math.min(1, Math.log10(1 + d) / Math.log10(1 + 15000));
+    let h = Math.min(1, region * 0.34 + city * (0.25 + 0.5 * urban));
+    h *= Math.min(1, Math.max(0.3, 1 - Math.max(0, (er ?? r0) - r0) / 1500));
+    if (er != null && er <= 0.5) h *= 0.25;
+    return h * (0.55 + 0.45 * k);
+  });
+}
+/* drought: an uneven parched region, driest at its heart; the sea isn't dry land */
+function droughtMesh(cell, R, k, at) {
+  const seed = cell.phase;
+  return terrainMesh(cell, R, R * 1.1, at, (x, y, r, er) => {
+    const h = 1 - smooth(0.25, 1.0, r + (fbm2(x / R * 1.6 + seed, y / R * 1.6) - 0.5) * 0.55);
+    return er != null && er <= 0.5 ? 0 : h * (0.6 + 0.4 * k);
+  });
+}
+/* earthquake: the strong-shaking zone (the shader works out the waves from the distance) */
+function quakeMesh(cell, R, k, at) {
+  return terrainMesh(cell, R, R * 1.05, at, (x, y, r) => 1 - smooth(0.85, 1.02, r));
+}
+/* snow: where the snowfall is (v_aux.x) and how deep it lies: deeper the higher
+   the ground (the valleys below the site get little), and it slides off slopes
+   steeper than about 40° */
+function snowMesh(cell, R, k, at) {
+  const seed = cell.phase;
+  return terrainMesh(cell, R, R * 1.1, at, (x, y, r, er, r0) => {
+    const region = 1 - smooth(0.6, 1.05, r + (fbm2(x / R * 1.4 + seed, y / R * 1.4) - 0.5) * 0.4);
+    const high = smooth(r0 - 550, r0 + 250, er ?? r0);
+    return { v: region * (0.2 + 0.8 * high) * (0.75 + 0.25 * k), a: region };
+  }, { adjust(grid, step) {
+    const n = HEAT_N + 1;
+    for (let j = 1; j < HEAT_N; j++) {
+      for (let i = 1; i < HEAT_N; i++) {
+        const sx = (grid[j * n + i + 1][6] - grid[j * n + i - 1][6]) / (2 * step);
+        const sy = (grid[(j + 1) * n + i][6] - grid[(j - 1) * n + i][6]) / (2 * step);
+        const slope = (Math.atan(Math.hypot(sx, sy)) * 180) / Math.PI;
+        grid[j * n + i][3] *= 1 - 0.85 * smooth(30, 50, slope);
+      }
+    }
+  }, auxKeeps: true });
+}
+const GROUND_MESH = { heat: heatMesh, drought: droughtMesh, quake: quakeMesh, snow: snowMesh };
 /* GLOF: from the lake, walk the steepest way down the valley, keeping momentum */
 function traceValley(at, L) {
   const STEP = 80;
@@ -457,8 +756,6 @@ function buildCell(cell) {
   const data = {};
   const n = (kind) => Math.round(COUNTS[cell.kind][kind] * k);
   if (cell.kind === 'snow') {
-    data[P.snowCloud] = make(n(P.snowCloud), () => { const [x, y] = disc(R * 1.1)(); return [x, y, 0]; });
-    data[P.snowGround] = make(n(P.snowGround), disc(R));
     data[P.drift] = make(n(P.drift), disc(R));
     data[P.flake] = make(n(P.flake), disc(R));
   } else if (cell.kind === 'glof') {
@@ -473,13 +770,29 @@ function buildCell(cell) {
     data[P.spray] = make(n(P.spray), lateral);
   } else if (cell.kind === 'smog') {
     data[P.smog] = make(n(P.smog), disc(R));
-  } else {
-    const m = heatMesh(cell, R, k, at);
+  }
+  if (cell.kind === 'drought') {
+    data[P.dust] = make(n(P.dust), disc(R * 0.9));
+    data[P.devil] = make(n(P.devil), disc(R * 0.6));
+  }
+  if (cell.kind === 'quake') {
+    // dust is thrown up round the epicentre and along the fault
+    const s = (FAULT_STRIKE * Math.PI) / 180, dir = [Math.sin(s), Math.cos(s)], len = R * 0.45;
+    cell.strike = dir; cell.len = len;
+    data[P.quakeDust] = make(n(P.quakeDust), () => {
+      if (Math.random() < 0.35) return disc(R * 0.25)();
+      const a = (Math.random() * 2 - 1) * len, j = (Math.random() - 0.5) * R * 0.06;
+      const x = dir[0] * a + dir[1] * j, y = dir[1] * a - dir[0] * j;
+      return [x, y, ground(x, y)];
+    });
+  }
+  if (GROUND_MESH[cell.kind]) {
+    const m = GROUND_MESH[cell.kind](cell, R, k, at);
     if (m.missing) missing = true;
     if (cell.mesh) gl.deleteBuffer(cell.mesh.b);
     const b = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, m.verts, gl.STATIC_DRAW);
-    cell.mesh = { b, n: m.verts.length / 4 };
+    cell.mesh = { b, n: m.verts.length / 6 };
   }
   if (cell.buffers) Object.values(cell.buffers).forEach((x) => gl.deleteBuffer(x.b));
   cell.buffers = Object.entries(data).map(([kind, arr]) => {
@@ -501,7 +814,7 @@ function translated(matrix, merc) {
   }
   return out;
 }
-const MINPX = { [P.flake]: 1.2, [P.drift]: 2, [P.spray]: 1.2, [P.smog]: 4 };
+const MINPX = { [P.flake]: 1, [P.drift]: 2, [P.spray]: 1.2, [P.smog]: 4 };
 let lastError = '';
 function render(_gl, matrix) {
   try { draw(matrix); } catch (err) {
@@ -540,6 +853,7 @@ function draw(matrix) {
     gl.uniform3f(prog.u.u_eye, (pos.x - merc.x) / mpm, (merc.y - pos.y) / mpm, (pos.z - merc.z) / mpm);
     gl.uniform1f(prog.u.u_time, now / 1000 + cell.phase);
     gl.uniform1f(prog.u.u_fade, Math.min(1, zoom - KIND[cell.kind].minZoom));
+    gl.uniform1f(prog.u.u_T, QUAKE_T);
     if (cell.path) { gl.uniform3fv(prog.u.u_path, cell.path); gl.uniform1f(prog.u.u_width, cell.width); }
     for (const buf of cell.buffers) {
       gl.uniform1f(prog.u.u_kind, buf.kind);
@@ -552,35 +866,45 @@ function draw(matrix) {
     }
   }
   gl.disableVertexAttribArray(prog.a.base); gl.disableVertexAttribArray(prog.a.seed); gl.disableVertexAttribArray(prog.a.corner);
-  drawHeat(matrix, live.filter((c) => c.mesh), now, zoom, pos);
+  drawGround(matrix, live.filter((c) => c.mesh), now, zoom, pos, focal);
   gl.depthMask(true);
   map.triggerRepaint();
 }
-function drawHeat(matrix, cells, now, zoom, pos) {
-  if (!cells.length || !heat) return;
+// the effects drawn on the ground: heatwave, drought, earthquake. Each redraws the
+// map under it from one copy of the frame (shimmering, parched, shaking)
+function drawGround(matrix, cells, now, zoom, pos, focal) {
+  if (!cells.length || !groundFx) return;
   const vp = gl.getParameter(gl.VIEWPORT);
   const hasScene = captureScene(vp);
-  gl.useProgram(heat.p);
-  gl.uniform1i(heat.u.u_scene, 0);
-  gl.uniform1f(heat.u.u_hasScene, hasScene ? 1 : 0);
-  gl.uniform4f(heat.u.u_vp, vp[0], vp[1], vp[2], vp[3]);
-  gl.uniform1f(heat.u.u_dpr, gl.drawingBufferWidth / Math.max(1, map.getCanvas().clientWidth));
-  gl.uniform1f(heat.u.u_tilt, Math.min(1, Math.max(0, (map.getPitch() - 30) / 45)));
-  gl.uniform1f(heat.u.u_close, Math.min(1, Math.max(0, (zoom - 10.5) / 3)));
-  gl.enableVertexAttribArray(heat.a);
+  const dpr = gl.drawingBufferWidth / Math.max(1, map.getCanvas().clientWidth);
+  const tilt = Math.min(1, Math.max(0, (map.getPitch() - 30) / 45)), close = Math.min(1, Math.max(0, (zoom - 10.5) / 3));
   for (const cell of cells) {
+    const g = groundFx[cell.kind];
+    if (!g) continue;
+    const set = (name, ...v) => { const loc = g.u[name]; if (loc) gl[`uniform${v.length}f`](loc, ...v); };
+    gl.useProgram(g.p);
+    if (g.u.u_scene) gl.uniform1i(g.u.u_scene, 0);
+    set('u_hasScene', hasScene ? 1 : 0);
+    set('u_vp', vp[0], vp[1], vp[2], vp[3]);
+    set('u_dpr', dpr); set('u_tilt', tilt); set('u_close', close); set('u_pxAng', 1 / focal);
+    set('u_wind', WIND[0], WIND[1]); set('u_T', QUAKE_T);
     const merc = window.mapboxgl.MercatorCoordinate.fromLngLat(cell.lngLat, cell.elev);
     const mpm = merc.meterInMercatorCoordinateUnits();
-    gl.uniformMatrix4fv(heat.u.u_matrix, false, translated(matrix, merc));
-    gl.uniform1f(heat.u.u_mpm, mpm);
-    gl.uniform3f(heat.u.u_eye, (pos.x - merc.x) / mpm, (merc.y - pos.y) / mpm, (pos.z - merc.z) / mpm);
-    gl.uniform1f(heat.u.u_time, now / 1000 + cell.phase);
-    gl.uniform1f(heat.u.u_fade, Math.min(1, zoom - KIND[cell.kind].minZoom));
+    gl.uniformMatrix4fv(g.u.u_matrix, false, translated(matrix, merc));
+    set('u_mpm', mpm);
+    set('u_eye', (pos.x - merc.x) / mpm, (merc.y - pos.y) / mpm, (pos.z - merc.z) / mpm);
+    set('u_time', now / 1000 + cell.phase);
+    set('u_fade', Math.min(1, zoom - KIND[cell.kind].minZoom));
+    set('u_R', cell.R);
+    if (cell.strike) { set('u_strike', cell.strike[0], cell.strike[1]); set('u_len', cell.len); }
     gl.bindBuffer(gl.ARRAY_BUFFER, cell.mesh.b);
-    gl.vertexAttribPointer(heat.a, 4, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(g.a);
+    gl.vertexAttribPointer(g.a, 4, gl.FLOAT, false, 24, 0);
+    if (g.aux >= 0) { gl.enableVertexAttribArray(g.aux); gl.vertexAttribPointer(g.aux, 2, gl.FLOAT, false, 24, 16); }
     gl.drawArrays(gl.TRIANGLES, 0, cell.mesh.n);
+    gl.disableVertexAttribArray(g.a);
+    if (g.aux >= 0) gl.disableVertexAttribArray(g.aux);
   }
-  gl.disableVertexAttribArray(heat.a);
 }
 
 /* ---------------------------------------------------------------- layer lifecycle */
